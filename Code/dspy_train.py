@@ -3,48 +3,49 @@ dspy_train.py
 
 Optional DSPy optimization script.
 
-This is the file that makes DSPy more than just a cleaner prompt wrapper.
+This version trains from TWO spreadsheets:
 
-It lets you train/optimize a DSPy module using your ground truth spreadsheet.
+    1. A reports spreadsheet that contains the report text, for example:
+       Files/Report/New Reports.xlsx
 
-Recommended order:
+    2. A ground-truth key spreadsheet that contains the answer labels, for example:
+       Files/GT/GroundTruthKeyNew.xlsx
 
-    1. Optimize CT first.
-    2. Optimize CTA second.
-    3. Optimize CTP third.
-    4. Do Combined last after CT/CTA/CTP are stable.
+The files are joined by case ID / Case Name.
 
 Example:
 
     python dspy_train.py \
-      --ground-truth Files/Ground_truths.xlsx \
-      --report-type CT \
+      --reports "Files/Report/New Reports.xlsx" \
+      --ground-truth "Files/GT/GroundTruthKeyNew.xlsx" \
+      --report-type CTA \
       --max-cases 120
 
-This will:
+Continuous prompt optimization loop:
 
-    1. Load CT examples from the spreadsheet.
-    2. Split them into train/dev/test.
-    3. Evaluate the baseline DSPy CTLabeler.
-    4. Optimize the CTLabeler with MIPROv2.
-    5. Evaluate the optimized program.
-    6. Save it to optimized_programs/ct_labeler.json.
+    python dspy_train.py \
+      --reports "Files/Report/New Reports.xlsx" \
+      --ground-truth "Files/GT/GroundTruthKeyNew.xlsx" \
+      --report-type CTA \
+      --loop
 
-Then main_dspy.py will automatically try to load that saved program.
+Stop loop mode with Ctrl+C.
 """
 
 from __future__ import annotations
+
 import argparse
 import contextlib
 import io
 import json
 import random
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Set
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
 import dspy
 import pandas as pd
+
 import config as cfg
 
 # Import base DSPy programs and model configuration.
@@ -63,11 +64,10 @@ from utils import normalize_labels
 # Normalization helpers
 # =============================================================================
 
+
 def normalize_gt(value: Any) -> Set[str]:
     """
     Normalize ground truth labels.
-
-    This should match your validator's behavior as closely as possible.
 
     Examples:
         "RMCA"       -> {"RMCA"}
@@ -91,28 +91,150 @@ def normalize_gt(value: Any) -> Set[str]:
         part.strip().upper()
         for part in text.split(",")
         if part.strip()
-    }
+    } or {"NONE"}
+
 
 
 def normalize_pred(value: Any) -> Set[str]:
     return set(normalize_labels(value))
 
 
+
+def normalize_case_id(value: Any) -> str:
+    """
+    Normalize case IDs so that the reports spreadsheet and ground-truth key can
+    be joined reliably.
+    """
+
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+
+    # Excel sometimes reads numeric IDs as floats, e.g. 123.0.
+    if text.endswith(".0"):
+        text = text[:-2]
+
+    return text
+
+
+
+def _normalize_col_name(name: Any) -> str:
+    return " ".join(str(name).strip().lower().replace("_", " ").split())
+
+
+
+def _find_column(df: pd.DataFrame, candidates: Sequence[str], *, purpose: str) -> str:
+    """
+    Find a dataframe column using exact matching first, then relaxed matching.
+    This avoids failures when the spreadsheet uses CT vs CT_Report, CTA GT vs
+    CTA_GT, etc.
+    """
+
+    existing = list(df.columns)
+
+    for col in candidates:
+        if col in df.columns:
+            return col
+
+    normalized_existing = {_normalize_col_name(col): col for col in existing}
+
+    for col in candidates:
+        key = _normalize_col_name(col)
+        if key in normalized_existing:
+            return normalized_existing[key]
+
+    raise ValueError(
+        f"Could not find {purpose} column.\n"
+        f"Tried: {list(candidates)}\n"
+        f"Available columns: {existing}"
+    )
+
+
+
+def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
+    seen = set()
+    out = []
+    for value in values:
+        if value and value not in seen:
+            seen.add(value)
+            out.append(value)
+    return out
+
+
+
+def _report_column_candidates(report_type: str) -> List[str]:
+    """
+    Report-text column candidates.
+
+    For New Reports.xlsx, columns are usually exactly CT, CTA, CTP, MRI.
+    Older versions used CT_Report, CTA_Report, etc.
+    """
+
+    report_type = report_type.upper()
+    training = cfg.TRAINING_COLUMN_CANDIDATES.get(report_type, {}).get("report", [])
+    report_like = cfg.REPORT_COLUMN_CANDIDATES.get(f"{report_type}_Report", [])
+
+    return _dedupe_keep_order([
+        *training,
+        *report_like,
+        report_type,
+        f"{report_type} Report",
+        f"{report_type}_Report",
+        f"{report_type} text",
+        f"{report_type}_Text",
+    ])
+
+
+
+def _gt_column_candidates(report_type: str) -> List[str]:
+    """
+    Ground-truth label column candidates.
+    """
+
+    report_type = report_type.upper()
+    training = cfg.TRAINING_COLUMN_CANDIDATES.get(report_type, {}).get("ground_truth", [])
+    modality = []
+
+    if hasattr(cfg, "MODALITY_COLUMN_CANDIDATES"):
+        modality = list(
+            cfg.MODALITY_COLUMN_CANDIDATES.get(report_type, {}).get("ground_truth", [])
+        )
+
+    return _dedupe_keep_order([
+        *training,
+        *modality,
+        f"{report_type} GT",
+        f"{report_type}_GT",
+        f"{report_type} Ground Truth",
+        f"{report_type}_Ground_Truth",
+        report_type,
+    ])
+
+
+
+def _signature_instructions(report_type: str) -> str:
+    report_type = report_type.upper()
+    if report_type == "CT":
+        return getattr(cfg, "CT_SIGNATURE_INSTRUCTIONS", "")
+    if report_type == "CTA":
+        return getattr(cfg, "CTA_SIGNATURE_INSTRUCTIONS", "")
+    if report_type == "CTP":
+        return getattr(cfg, "CTP_SIGNATURE_INSTRUCTIONS", "")
+    return ""
+
+
 # =============================================================================
 # DSPy metric
 # =============================================================================
+
 
 def exact_match_metric(example, pred, trace=None) -> float:
     """
     Metric used by DSPy during optimization.
 
-    DSPy tries to improve this score.
-
-    This metric returns:
-        1.0 if predicted label set exactly matches ground truth.
-        0.0 otherwise.
-
-    This mirrors the strict style of your validator.
+    Returns 1.0 if the predicted label set exactly matches ground truth,
+    otherwise 0.0.
     """
 
     gold = normalize_gt(example.labels)
@@ -125,14 +247,13 @@ def exact_match_metric(example, pred, trace=None) -> float:
 # Optimizer compatibility helper
 # =============================================================================
 
+
 def get_optimizer(metric):
     """
     Create a DSPy optimizer.
 
     DSPy versions sometimes expose MIPROv2 in slightly different places.
-    This helper tries both common locations.
-
-    auto="light" is recommended first because local Ollama optimization can be slow.
+    auto="light" is a good starting point for local Ollama optimization.
     """
 
     try:
@@ -143,74 +264,100 @@ def get_optimizer(metric):
 
 
 # =============================================================================
-# Loading examples
+# Loading examples from separate reports + ground-truth files
 # =============================================================================
-
-def _first_existing(row, candidates: List[str]) -> Any:
-    """
-    Return first non-empty value from candidate column names.
-    """
-
-    for col in candidates:
-        if col in row and not pd.isna(row.get(col)):
-            return row.get(col)
-
-    return ""
 
 
 def load_examples(
+    reports_file: str,
     ground_truth_file: str,
     report_type: str,
-    max_cases: int | None = None,
+    max_cases: Optional[int] = None,
 ) -> List[dspy.Example]:
     """
-    Load DSPy examples from your ground truth spreadsheet.
+    Load DSPy examples by joining:
 
-    Each DSPy example needs:
-        - report_text input
-        - labels output
+        reports_file      -> contains report text columns: CT, CTA, CTP, MRI
+        ground_truth_file -> contains answer-key columns: CT_GT, CTA_GT, CTP_GT
 
-    The labels are the answer key.
-
-    Args:
-        ground_truth_file:
-            Path to your ground truth spreadsheet.
-
-        report_type:
-            CT, CTA, or CTP.
-
-        max_cases:
-            Optional limit for faster experiments.
+    The join key is Case Name / case_id / Case ID.
     """
-
-    df = pd.read_excel(ground_truth_file)
 
     report_type = report_type.upper()
 
-    # Decide which columns to use based on config.py.
-    if report_type not in cfg.TRAINING_COLUMN_CANDIDATES:
+    if report_type not in {"CT", "CTA", "CTP"}:
         raise ValueError("report_type must be CT, CTA, or CTP")
-    report_col_candidates = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["report"]
-    gt_col_candidates = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["ground_truth"]
+
+    reports_path = Path(reports_file)
+    gt_path = Path(ground_truth_file)
+
+    if not reports_path.exists():
+        raise FileNotFoundError(f"Reports file not found: {reports_path}")
+
+    if not gt_path.exists():
+        raise FileNotFoundError(f"Ground-truth file not found: {gt_path}")
+
+    reports_df = pd.read_excel(reports_path)
+    gt_df = pd.read_excel(gt_path)
+
+    reports_case_col = _find_column(
+        reports_df,
+        cfg.CASE_ID_COLUMNS,
+        purpose="case ID in reports file",
+    )
+    gt_case_col = _find_column(
+        gt_df,
+        cfg.CASE_ID_COLUMNS,
+        purpose="case ID in ground-truth file",
+    )
+
+    report_col = _find_column(
+        reports_df,
+        _report_column_candidates(report_type),
+        purpose=f"{report_type} report text in reports file",
+    )
+    gt_col = _find_column(
+        gt_df,
+        _gt_column_candidates(report_type),
+        purpose=f"{report_type} ground-truth labels in ground-truth file",
+    )
+
+    print("\nResolved training columns")
+    print(f"  Reports file:      {reports_path}")
+    print(f"  Ground-truth file: {gt_path}")
+    print(f"  Reports case col:  {reports_case_col}")
+    print(f"  Reports text col:  {report_col}")
+    print(f"  GT case col:       {gt_case_col}")
+    print(f"  GT label col:      {gt_col}")
+
+    gt_by_case: Dict[str, Any] = {}
+    for _, row in gt_df.iterrows():
+        case_key = normalize_case_id(row.get(gt_case_col))
+        if not case_key:
+            continue
+        gt_by_case[case_key] = row.get(gt_col)
 
     examples: List[dspy.Example] = []
+    missing_gt = 0
+    missing_report = 0
 
-    for _, row in df.iterrows():
-        case_id = str(_first_existing(row, cfg.CASE_ID_COLUMNS) or "").strip()
+    for _, row in reports_df.iterrows():
+        case_id = normalize_case_id(row.get(reports_case_col))
+        report_text = "" if pd.isna(row.get(report_col)) else str(row.get(report_col)).strip()
 
-        report_text = str(_first_existing(row, report_col_candidates) or "").strip()
-        labels = _first_existing(row, gt_col_candidates)
-
-        # Skip examples without case id or report text.
-        if not case_id or not report_text:
+        if not case_id:
             continue
 
-        # DSPy examples store both input and expected output.
-        #
-        # .with_inputs("report_text") tells DSPy:
-        #     report_text is the input field.
-        #
-        # labels remains the expected answer used by the metric.
+        if not report_text:
+            missing_report += 1
+            continue
+
+        if case_id not in gt_by_case:
+            missing_gt += 1
+            continue
+
+        labels = gt_by_case[case_id]
+
         ex = dspy.Example(
             case_id=case_id,
             report_text=report_text,
@@ -222,6 +369,17 @@ def load_examples(
     if max_cases:
         examples = examples[:max_cases]
 
+    print(f"Loaded {len(examples)} {report_type} examples")
+    print(f"Skipped rows missing report text: {missing_report}")
+    print(f"Skipped rows missing ground truth: {missing_gt}")
+
+    if not examples:
+        raise ValueError(
+            "No training examples were loaded. This would make DSPy's trainset empty.\n"
+            "Check that the reports file and ground-truth key share the same case IDs, "
+            "and that the report/ground-truth column names are correct."
+        )
+
     return examples
 
 
@@ -229,16 +387,10 @@ def load_examples(
 # Splitting examples
 # =============================================================================
 
+
 def split_examples(examples: List[dspy.Example], seed: int = 42):
     """
     Split examples into train/dev/test sets.
-
-    Important:
-        For the full multi-modality experiment, split by case_id first so CT,
-        CTA, CTP, and Combined from the same case do not leak across sets.
-
-    Since this script optimizes one modality at a time, this simple shuffle split
-    is acceptable for early testing.
     """
 
     examples = list(examples)
@@ -246,12 +398,30 @@ def split_examples(examples: List[dspy.Example], seed: int = 42):
 
     n = len(examples)
 
-    train_end = int(n * 0.70)
-    dev_end = int(n * 0.85)
+    if n < 3:
+        raise ValueError(
+            f"Only {n} examples were loaded. Use more cases so train/dev/test "
+            "sets are not empty."
+        )
+
+    train_end = max(1, int(n * 0.70))
+    dev_end = max(train_end + 1, int(n * 0.85)) if n >= 4 else train_end + 1
+    dev_end = min(dev_end, n)
 
     trainset = examples[:train_end]
     devset = examples[train_end:dev_end]
     testset = examples[dev_end:]
+
+    # If the dataset is small, keep DSPy from receiving an empty validation set.
+    if not devset:
+        devset = trainset
+
+    # If the dataset is small, still evaluate on something instead of crashing.
+    if not testset:
+        testset = devset
+
+    if not trainset:
+        raise ValueError("Trainset cannot be empty. Load more examples or increase --max-cases.")
 
     return trainset, devset, testset
 
@@ -260,11 +430,10 @@ def split_examples(examples: List[dspy.Example], seed: int = 42):
 # Evaluation
 # =============================================================================
 
+
 def evaluate(program, examples: List[dspy.Example], name: str) -> float:
     """
-    Evaluate a DSPy program on a set of examples.
-
-    This prints exact-match accuracy.
+    Evaluate a DSPy program on exact-match accuracy.
     """
 
     correct = 0
@@ -283,102 +452,99 @@ def evaluate(program, examples: List[dspy.Example], name: str) -> float:
     return acc
 
 
-
 # =============================================================================
-# Optimization logging helpers
+# Logging helpers
 # =============================================================================
 
-def timestamp() -> str:
-    return datetime.now().strftime(getattr(cfg, "RUN_TIMESTAMP_FORMAT", "%Y%m%d_%H%M%S"))
 
-
-def make_optimization_run_dir(report_type: str, iteration: int | None = None) -> Path:
-    """Create a timestamped folder for one DSPy optimization attempt."""
-    base = Path(getattr(cfg, "DSPY_OPTIMIZATION_LOG_DIR", "Files/Results/DSPy_Optimization_Runs"))
-    name = timestamp()
-    if iteration is not None:
-        name = f"{name}_iter_{iteration:04d}"
-    run_dir = base / report_type.upper() / name
+def make_optimization_run_dir(report_type: str, iteration: int) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = (
+        Path("Files")
+        / "Results"
+        / "DSPy_Optimization_Runs"
+        / report_type.upper()
+        / f"{timestamp}_iter_{iteration:04d}"
+    )
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
 
-def save_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
 
+def save_dspy_history(path: Path, n: int = 50) -> None:
+    """
+    Save visible DSPy LM history. DSPy does not always expose every internal
+    candidate prompt, but this captures what inspect_history can show.
+    """
 
-def save_json_file(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-
-def save_program_snapshot(program, path: Path) -> None:
-    """Save a DSPy program snapshot, falling back to repr if save() fails."""
-    try:
-        program.save(str(path))
-    except Exception as exc:
-        save_text(path.with_suffix(".txt"), f"Could not save DSPy program as JSON: {exc}\n\n{repr(program)}")
-
-
-def dump_dspy_history(path: Path) -> None:
-    """Save DSPy's visible LM interaction history for prompt-audit/debugging."""
-    n = int(getattr(cfg, "DSPY_INSPECT_HISTORY_N", 200))
     buffer = io.StringIO()
     try:
         with contextlib.redirect_stdout(buffer):
-            result = dspy.inspect_history(n=n)
+            dspy.inspect_history(n=n)
         text = buffer.getvalue()
-        if result is not None:
-            text += "\n" + str(result)
-        if not text.strip():
-            text = "DSPy inspect_history returned no visible history for this version/configuration."
     except Exception as exc:
-        text = f"Could not inspect DSPy history: {repr(exc)}"
-    save_text(path, text)
+        text = f"Could not inspect DSPy history: {exc}\n"
+
+    path.write_text(text, encoding="utf-8")
 
 
-def instruction_text_for(report_type: str) -> str:
-    report_type = report_type.upper()
-    if report_type == "CT":
-        return cfg.CT_SIGNATURE_INSTRUCTIONS
-    if report_type == "CTA":
-        return cfg.CTA_SIGNATURE_INSTRUCTIONS
-    if report_type == "CTP":
-        return cfg.CTP_SIGNATURE_INSTRUCTIONS
-    return ""
+
+def save_program(program, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        program.save(str(path))
+    except Exception as exc:
+        path.with_suffix(".error.txt").write_text(str(exc), encoding="utf-8")
 
 
 # =============================================================================
 # Training one modality
 # =============================================================================
 
+
+def _program_for_report_type(report_type: str):
+    report_type = report_type.upper()
+
+    if report_type == "CT":
+        return CTLabeler(), "ct_labeler.json"
+    if report_type == "CTA":
+        return CTALabeler(), "cta_labeler.json"
+    if report_type == "CTP":
+        return CTPLabeler(), "ctp_labeler.json"
+
+    raise ValueError("report_type must be CT, CTA, or CTP")
+
+
+
 def train_one(
     report_type: str,
+    reports_file: str,
     ground_truth_file: str,
-    max_cases: int | None = None,
-    *,
-    run_dir: Path | None = None,
-    iteration: int | None = None,
-):
+    max_cases: Optional[int] = None,
+    iteration: int = 1,
+    save_run_logs: bool = True,
+    history_size: int = 50,
+) -> Dict[str, Any]:
     """
     Optimize one modality-specific DSPy program.
-
-    When run_dir is provided, this also logs the base instructions, baseline
-    program, optimized program, DSPy LM history, and summary metrics for the
-    experiment run.
     """
 
     report_type = report_type.upper()
-    run_dir = run_dir or make_optimization_run_dir(report_type, iteration)
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     # Configure the Ollama model through DSPy.
     configure_dspy()
 
-    # Load examples from the answer key.
+    run_dir: Optional[Path] = None
+    if save_run_logs:
+        run_dir = make_optimization_run_dir(report_type, iteration)
+        (run_dir / "base_signature_instructions.txt").write_text(
+            _signature_instructions(report_type),
+            encoding="utf-8",
+        )
+
+    # Load examples by joining the reports file to the answer key.
     examples = load_examples(
+        reports_file=reports_file,
         ground_truth_file=ground_truth_file,
         report_type=report_type,
         max_cases=max_cases,
@@ -388,28 +554,19 @@ def train_one(
     trainset, devset, testset = split_examples(examples)
 
     # Select the correct base program.
-    if report_type == "CT":
-        program = CTLabeler()
-        save_name = "ct_labeler.json"
-    elif report_type == "CTA":
-        program = CTALabeler()
-        save_name = "cta_labeler.json"
-    elif report_type == "CTP":
-        program = CTPLabeler()
-        save_name = "ctp_labeler.json"
-    else:
-        raise ValueError("report_type must be CT, CTA, or CTP")
+    program, save_name = _program_for_report_type(report_type)
 
     print(f"\nTraining {report_type}")
     print(f"Train: {len(trainset)} | Dev: {len(devset)} | Test: {len(testset)}")
-    print(f"Optimization log folder: {run_dir}")
 
-    save_text(run_dir / "base_signature_instructions.txt", instruction_text_for(report_type))
-    save_program_snapshot(program, run_dir / "baseline_program.json")
+    if run_dir:
+        save_program(program, run_dir / "baseline_program.json")
 
     # Evaluate the unoptimized program first.
-    baseline_accuracy = evaluate(program, testset, f"{report_type} baseline")
-    dump_dspy_history(run_dir / "dspy_history_after_baseline_eval.txt")
+    baseline_acc = evaluate(program, testset, f"{report_type} baseline")
+
+    if run_dir:
+        save_dspy_history(run_dir / "dspy_history_after_baseline_eval.txt", n=history_size)
 
     # Create optimizer.
     optimizer = get_optimizer(exact_match_metric)
@@ -420,71 +577,56 @@ def train_one(
         trainset=trainset,
         valset=devset,
     )
-    dump_dspy_history(run_dir / "dspy_history_after_compile.txt")
+
+    if run_dir:
+        save_dspy_history(run_dir / "dspy_history_after_compile.txt", n=history_size)
 
     # Evaluate optimized program.
-    optimized_accuracy = evaluate(optimized_program, testset, f"{report_type} optimized")
-    dump_dspy_history(run_dir / "dspy_history_after_optimized_eval.txt")
+    optimized_acc = evaluate(optimized_program, testset, f"{report_type} optimized")
 
-    # Save optimized program to the normal active DSPy program directory.
+    if run_dir:
+        save_dspy_history(run_dir / "dspy_history_after_optimized_eval.txt", n=history_size)
+        save_program(optimized_program, run_dir / "optimized_program.json")
+
+    # Save active optimized program. Main labeling will load this automatically.
     Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
-    save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
-    optimized_program.save(str(save_path))
-
-    # Also save a timestamped snapshot so no iteration is lost.
-    save_program_snapshot(optimized_program, run_dir / "optimized_program.json")
+    active_save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
+    optimized_program.save(str(active_save_path))
 
     summary = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "iteration": iteration,
         "report_type": report_type,
-        "ground_truth_file": ground_truth_file,
+        "reports_file": str(reports_file),
+        "ground_truth_file": str(ground_truth_file),
         "max_cases": max_cases,
+        "total_examples": len(examples),
         "train_examples": len(trainset),
         "dev_examples": len(devset),
         "test_examples": len(testset),
-        "baseline_accuracy": baseline_accuracy,
-        "optimized_accuracy": optimized_accuracy,
-        "active_saved_program": str(save_path),
-        "timestamped_run_dir": str(run_dir),
-        "note": (
-            "This folder preserves the final optimized program for this iteration and "
-            "the visible DSPy LM prompt/history via dspy.inspect_history. Some DSPy "
-            "versions do not expose every discarded internal candidate prompt directly."
-        ),
+        "baseline_accuracy": baseline_acc,
+        "optimized_accuracy": optimized_acc,
+        "active_saved_program": str(active_save_path),
+        "timestamped_run_dir": str(run_dir) if run_dir else None,
     }
-    save_json_file(run_dir / "optimization_summary.json", summary)
 
-    print(f"Saved active optimized {report_type} program to {save_path}")
-    print(f"Saved timestamped optimization logs to {run_dir}")
+    if run_dir:
+        (run_dir / "optimization_summary.json").write_text(
+            json.dumps(summary, indent=2),
+            encoding="utf-8",
+        )
+
+    print(f"Saved optimized {report_type} program to {active_save_path}")
+    if run_dir:
+        print(f"Saved this optimization run to {run_dir}")
+
     return summary
 
-
-def train_loop(
-    report_type: str,
-    ground_truth_file: str,
-    max_cases: int | None = None,
-    sleep_seconds: float = 0,
-) -> None:
-    """Keep optimizing repeatedly until the user stops the process with Ctrl+C."""
-    iteration = 1
-    print("Running continuous DSPy optimization. Press Ctrl+C to stop.")
-    while True:
-        run_dir = make_optimization_run_dir(report_type, iteration)
-        train_one(
-            report_type=report_type,
-            ground_truth_file=ground_truth_file,
-            max_cases=max_cases,
-            run_dir=run_dir,
-            iteration=iteration,
-        )
-        iteration += 1
-        if sleep_seconds > 0:
-            time.sleep(sleep_seconds)
 
 # =============================================================================
 # Command-line entry point
 # =============================================================================
+
 
 def main():
     """
@@ -494,9 +636,17 @@ def main():
     parser = argparse.ArgumentParser(description="Optimize DSPy stroke labelers.")
 
     parser.add_argument(
+        "--reports",
+        "--reports-file",
+        dest="reports_file",
+        default=getattr(cfg, "TRAINING_REPORTS_FILE", cfg.INPUT_REPORT_FILE),
+        help="Path to reports Excel file containing CT/CTA/CTP report text.",
+    )
+
+    parser.add_argument(
         "--ground-truth",
         default=cfg.GROUND_TRUTH_FILE,
-        help="Path to ground truth Excel file.",
+        help="Path to ground-truth answer key Excel file.",
     )
 
     parser.add_argument(
@@ -516,34 +666,45 @@ def main():
     parser.add_argument(
         "--loop",
         action="store_true",
-        help="Keep running optimization attempts until stopped with Ctrl+C.",
+        help="Keep optimizing repeatedly until stopped with Ctrl+C.",
     )
 
     parser.add_argument(
-        "--sleep-seconds",
-        type=float,
-        default=getattr(cfg, "DSPY_TRAIN_LOOP_SLEEP_SECONDS", 0),
-        help="Seconds to pause between looped optimization attempts.",
+        "--no-run-logs",
+        action="store_true",
+        help="Disable timestamped optimization folders.",
+    )
+
+    parser.add_argument(
+        "--history-size",
+        type=int,
+        default=50,
+        help="Number of visible DSPy history items to save per stage.",
     )
 
     args = parser.parse_args()
 
+    iteration = 1
+
     try:
-        if args.loop:
-            train_loop(
-                report_type=args.report_type,
-                ground_truth_file=args.ground_truth,
-                max_cases=args.max_cases,
-                sleep_seconds=args.sleep_seconds,
-            )
-        else:
+        while True:
             train_one(
                 report_type=args.report_type,
+                reports_file=args.reports_file,
                 ground_truth_file=args.ground_truth,
                 max_cases=args.max_cases,
+                iteration=iteration,
+                save_run_logs=not args.no_run_logs,
+                history_size=args.history_size,
             )
+
+            if not args.loop:
+                break
+
+            iteration += 1
+
     except KeyboardInterrupt:
-        print("\nStopped continuous DSPy optimization.")
+        print("\nStopped DSPy optimization loop.")
 
 
 if __name__ == "__main__":

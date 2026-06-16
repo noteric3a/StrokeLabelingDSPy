@@ -40,6 +40,9 @@ OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 # =============================================================================
 
 INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
+# DSPy training can use a separate report-text workbook from the ground-truth key.
+# By default, use the same reports workbook as the main labeler.
+TRAINING_REPORTS_FILE = INPUT_REPORT_FILE
 OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
 GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
 TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"
@@ -82,15 +85,15 @@ REPORT_COLUMN_CANDIDATES = {
 
 TRAINING_COLUMN_CANDIDATES = {
     "CT": {
-        "report": ["CT Report", "CT_Report", "CT text", "CT_Text"],
+        "report": ["CT Report", "CT_Report", "CT text", "CT_Text", "CT"],
         "ground_truth": ["CT GT", "CT_GT", "CT"],
     },
     "CTA": {
-        "report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text"],
+        "report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text", "CTA"],
         "ground_truth": ["CTA GT", "CTA_GT", "CTA"],
     },
     "CTP": {
-        "report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text"],
+        "report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text", "CTP"],
         "ground_truth": ["CTP GT", "CTP_GT", "CTP"],
     },
 }
