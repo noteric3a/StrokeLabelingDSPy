@@ -9,9 +9,9 @@ entire existing main.py.
 Basic usage:
 
     python main.py \
-      --input Files/Filtered_Reports.xlsx \
-      --output Files/labeled_cases_dspy.json \
-      --ground-truth Files/Ground_truths.xlsx \
+      --input Files/Report/Filtered_Reports.xlsx \
+      --output Files/Results/labeled_cases_dspy.json \
+      --ground-truth Files/GT/Ground_truths.xlsx \
       --max-concurrent 4
 
 What it does:

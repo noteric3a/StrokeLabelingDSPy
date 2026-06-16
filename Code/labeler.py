@@ -1,47 +1,9 @@
-"""
-labeler_dspy.py
-
-This file is a DSPy-based version of your case labeler.
-
-It is designed to preserve your existing JSON structure so your downstream
-pipeline still works.
-
-The output case will contain fields like:
-
-    CT_GT
-    CT_GT_reasoning
-    CTA_GT
-    CTA_GT_reasoning
-    CTP_GT
-    CTP_GT_reasoning
-    Combined_GT
-    CT_Combined_GT_reasoning
-
-It also supports confidence mode, similar to your manual pipeline:
-
-    - run the same report multiple times
-    - count the labels
-    - choose the majority
-    - store possible answers and confidence percentage
-    - union the reasoning from winning attempts
-
-Finally, it calls your existing review checker:
-
-    add_review_flags(case)
-
-That means your red/yellow flags should still work.
-"""
-
 from __future__ import annotations
 import asyncio
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Tuple
-from Code.config import (
-    CONFIDENCE_ATTEMPTS,
-    CONFIDENCE_THRESHOLD_PERCENTAGE,
-    ENABLE_CONFIDENCE_CHECKING,
-)
+from Code import config as cfg
 
 from Code.dspy_programs import (
     StrokePrediction,
@@ -143,14 +105,14 @@ def _union_reasoning(final_key: Tuple[str, ...], attempts: List[StrokePrediction
 
     # Keep only the first few reasoning samples so the spreadsheet does not
     # become enormous.
-    final_text = "\n".join(f"- {r}" for r in winning_reasonings[:5])
+    final_text = "\n".join(f"- {r}" for r in winning_reasonings[:cfg.CONFIDENCE_REASONING_WINNING_LIMIT])
 
     if not final_text:
         final_text = "Winning label selected by repeated DSPy runs, but no reasoning was returned."
 
     if alternate_reasonings:
         final_text += "\n\nAlternate-label reasoning samples:\n"
-        final_text += "\n".join(f"- {r}" for r in alternate_reasonings[:5])
+        final_text += "\n".join(f"- {r}" for r in alternate_reasonings[:cfg.CONFIDENCE_REASONING_ALTERNATE_LIMIT])
 
     return final_text
 
@@ -180,7 +142,7 @@ async def run_prediction_with_confidence(
 
     # Simple mode:
     # Run once and return 100% confidence.
-    if not ENABLE_CONFIDENCE_CHECKING:
+    if not cfg.ENABLE_CONFIDENCE_CHECKING:
         result = await asyncio.to_thread(sync_predict_fn)
 
         return {
@@ -195,7 +157,7 @@ async def run_prediction_with_confidence(
     # Run the same prediction multiple times.
     attempts: List[StrokePrediction] = []
 
-    for _ in range(CONFIDENCE_ATTEMPTS):
+    for _ in range(cfg.CONFIDENCE_ATTEMPTS):
         result = await asyncio.to_thread(sync_predict_fn)
         attempts.append(result)
 
@@ -209,7 +171,7 @@ async def run_prediction_with_confidence(
     confidence_percentage = final_count / len(attempts) * 100
 
     # Apply your threshold.
-    is_confident = confidence_percentage >= CONFIDENCE_THRESHOLD_PERCENTAGE
+    is_confident = confidence_percentage >= cfg.CONFIDENCE_THRESHOLD_PERCENTAGE
 
     # Store all possible answers for debugging.
     possible_answers = [
@@ -366,7 +328,7 @@ async def label_full_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any
     return case
 
 
-async def label_cases(cases: List[Dict[str, Any]], max_concurrent: int = 4) -> List[Dict[str, Any]]:
+async def label_cases(cases: List[Dict[str, Any]], max_concurrent: int = cfg.MAX_CONCURRENT_CASES) -> List[Dict[str, Any]]:
     """
     Label many cases concurrently.
 

@@ -1,5 +1,3 @@
-"""Lazy Excel loading utilities to minimize memory footprint."""
-
 from typing import Generator, Dict, Any
 import pandas as pd
 from pathlib import Path

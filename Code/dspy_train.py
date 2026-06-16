@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any, List, Set
 import dspy
 import pandas as pd
-from Code.config import DSPY_PROGRAM_DIR
+from Code import config as cfg
 
 # Import base DSPy programs and model configuration.
 from Code.dspy_programs import (
@@ -182,23 +182,16 @@ def load_examples(
 
     report_type = report_type.upper()
 
-    # Decide which columns to use based on modality.
-    if report_type == "CT":
-        report_col_candidates = ["CT Report", "CT_Report", "CT text", "CT_Text"]
-        gt_col_candidates = ["CT GT", "CT"]
-    elif report_type == "CTA":
-        report_col_candidates = ["CTA Report", "CTA_Report", "CTA text", "CTA_Text"]
-        gt_col_candidates = ["CTA GT", "CTA"]
-    elif report_type == "CTP":
-        report_col_candidates = ["CTP Report", "CTP_Report", "CTP text", "CTP_Text"]
-        gt_col_candidates = ["CTP GT", "CTP"]
-    else:
+    # Decide which columns to use based on config.py.
+    if report_type not in cfg.TRAINING_COLUMN_CANDIDATES:
         raise ValueError("report_type must be CT, CTA, or CTP")
+    report_col_candidates = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["report"]
+    gt_col_candidates = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["ground_truth"]
 
     examples: List[dspy.Example] = []
 
     for _, row in df.iterrows():
-        case_id = str(_first_existing(row, ["Case Name", "case_id", "Case ID", "ID"]) or "").strip()
+        case_id = str(_first_existing(row, cfg.CASE_ID_COLUMNS) or "").strip()
 
         report_text = str(_first_existing(row, report_col_candidates) or "").strip()
         labels = _first_existing(row, gt_col_candidates)
@@ -344,8 +337,8 @@ def train_one(report_type: str, ground_truth_file: str, max_cases: int | None = 
     evaluate(optimized_program, testset, f"{report_type} optimized")
 
     # Save optimized program.
-    Path(DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
-    save_path = Path(DSPY_PROGRAM_DIR) / save_name
+    Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
+    save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
 
     optimized_program.save(str(save_path))
 
@@ -365,7 +358,7 @@ def main():
 
     parser.add_argument(
         "--ground-truth",
-        required=True,
+        default=cfg.GROUND_TRUTH_FILE,
         help="Path to ground truth Excel file.",
     )
 
