@@ -3,9 +3,9 @@ import asyncio
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Tuple
-from Code import config as cfg
+import config as cfg
 
-from Code.dspy_programs import (
+from dspy_programs import (
     StrokePrediction,
     initialize_dspy_programs,
     label_ct,
@@ -14,7 +14,7 @@ from Code.dspy_programs import (
     label_combined,
 )
 
-from Code.review_checks import add_review_flags
+from review_checks import add_review_flags
 
 
 # =============================================================================

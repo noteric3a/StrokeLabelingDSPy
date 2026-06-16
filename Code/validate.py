@@ -14,10 +14,10 @@ from typing import Any, Dict
 
 import pandas as pd
 
-from Code.utils import normalize_labels
-from Code.convert import convert
-from Code.lazy_excel import LazyExcelReader
-from Code import config as cfg
+from utils import normalize_labels
+from convert import convert
+from lazy_excel import LazyExcelReader
+import config as cfg
 
 def normalize_gt(label_str: Any) -> set:
     """Normalize a ground truth label string into a set of uppercase labels."""

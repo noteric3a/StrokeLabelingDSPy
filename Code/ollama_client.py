@@ -4,8 +4,8 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict
 
-from Code.config import MODEL_NAME, OLLAMA_URL, REQUEST_TIMEOUT_SECONDS, NUM_PREDICT
-import Code.config as cfg
+from config import MODEL_NAME, OLLAMA_URL, REQUEST_TIMEOUT_SECONDS, NUM_PREDICT
+import config as cfg
 
 # Optional config value. If NUM_CTX is missing, default to 8192.
 NUM_CTX = getattr(cfg, "NUM_CTX", 8192)

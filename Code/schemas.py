@@ -3,7 +3,7 @@ JSON schemas passed to Ollama structured output.
 """
 
 from typing import Any, Dict
-from Code.config import ALLOWED_LABELS
+from config import ALLOWED_LABELS
 
 
 def label_array_schema() -> Dict[str, Any]:

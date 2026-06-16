@@ -10,8 +10,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Tuple
 
-import Code.config as cfg
-from Code.utils import normalize_labels
+import config as cfg
+from utils import normalize_labels
 
 
 DEFAULT_CONFIDENCE_RUNS = cfg.CONFIDENCE_RUNS

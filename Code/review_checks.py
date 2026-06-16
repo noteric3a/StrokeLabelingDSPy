@@ -10,9 +10,9 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from Code import config as cfg
-from Code.utils import normalize_labels
-from Code.confidence import min_confidence_percentage
+import config as cfg
+from utils import normalize_labels
+from confidence import min_confidence_percentage
 
 ALLOWED_LABELS = cfg.ALLOWED_LABELS
 

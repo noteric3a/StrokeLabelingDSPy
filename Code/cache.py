@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 from typing import Set
-from Code import config as cfg
+import config as cfg
 
 
 class ProcessingCache:

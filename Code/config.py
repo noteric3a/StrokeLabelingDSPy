@@ -251,6 +251,26 @@ DSPY_PROGRAM_NAMES = {
     "Combined": "combined_labeler",
 }
 
+# =============================================================================
+# Excel prompt display settings
+# =============================================================================
+# When True, convert.py appends prompt/instruction columns to the final Excel
+# sheet.  These are copied from the active config.py instructions at conversion
+# time, so the spreadsheet records exactly what prompt rules were used for the
+# run even if the JSON did not store prompt text per case.
+INCLUDE_CURRENT_PROMPT_COLUMNS = True
+
+# Each key becomes an Excel column header.  Each value is repeated on every row.
+# This is intentional: filtering any case row still preserves the prompt context
+# used for that output.  Set INCLUDE_CURRENT_PROMPT_COLUMNS = False if the sheet
+# becomes too large.
+CURRENT_PROMPT_COLUMNS = {
+    "CT Current Prompt": CT_SIGNATURE_INSTRUCTIONS,
+    "CTA Current Prompt": CTA_SIGNATURE_INSTRUCTIONS,
+    "CTP Current Prompt": CTP_SIGNATURE_INSTRUCTIONS,
+    "Combined Current Prompt": COMBINED_SIGNATURE_INSTRUCTIONS,
+}
+
 
 # =============================================================================
 # Deterministic review/checker constants

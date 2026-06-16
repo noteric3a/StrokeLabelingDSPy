@@ -40,10 +40,10 @@ from pathlib import Path
 from typing import Any, List, Set
 import dspy
 import pandas as pd
-from Code import config as cfg
+import config as cfg
 
 # Import base DSPy programs and model configuration.
-from Code.dspy_programs import (
+from dspy_programs import (
     configure_dspy,
     CTLabeler,
     CTALabeler,
@@ -51,7 +51,7 @@ from Code.dspy_programs import (
 )
 
 # Reuse your existing label normalizer.
-from Code.utils import normalize_labels
+from utils import normalize_labels
 
 
 # =============================================================================

@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 
 import dspy
 
-from Code import config as cfg
-from Code.utils import normalize_labels
+import config as cfg
+from utils import normalize_labels
 
 
 @dataclass

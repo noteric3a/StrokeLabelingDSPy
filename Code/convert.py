@@ -10,7 +10,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from Code import config as cfg
+import config as cfg
 
 
 # Most converter constants are centralized in config.py.
@@ -32,7 +32,7 @@ REVIEW_FLAG_COLUMNS = cfg.REVIEW_FLAG_COLUMNS
 # Review highlighting is intentionally separated into a small helper file so
 # answer-key comparison code stays focused on red mismatch highlighting.
 try:
-    from Code.spreadsheet_debug_checks import (
+    from spreadsheet_debug_checks import (
         find_review_excel_rows_by_severity,
         find_strange_excel_rows_with_reasons,
     )
@@ -232,7 +232,7 @@ def _read_answer_key(answer_key_path: Path) -> pd.DataFrame:
 def _configured_answer_key_path() -> Path | None:
     """Return config.GROUND_TRUTH_FILE only when it exists and is not blank."""
     try:
-        import Code.config as config  # type: ignore
+        import config  # type: ignore
     except Exception:
         return None
 

@@ -6,7 +6,7 @@ from typing import Any, List
 
 import pandas as pd
 
-from Code import config as cfg
+import config as cfg
 
 
 def clean_report(value: Any) -> str:

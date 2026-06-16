@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 import pandas as pd
-from Code import config as cfg
+import config as cfg
 
 
 CASE_ID_COLUMN_CANDIDATES = cfg.CASE_ID_COLUMN_CANDIDATES
