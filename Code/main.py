@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -27,6 +28,11 @@ import pandas as pd
 import config as cfg
 from labeler import label_cases
 from validate import check_answers
+
+# Keep the one-line progress bar clean by hiding repeated DSPy warning messages.
+logging.getLogger("dspy").setLevel(logging.ERROR)
+logging.getLogger("dspy.clients.lm").setLevel(logging.ERROR)
+logging.getLogger("litellm").setLevel(logging.ERROR)
 
 
 def _first_existing(row, candidates: List[str]) -> Any:

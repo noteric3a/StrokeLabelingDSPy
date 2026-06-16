@@ -1,9 +1,11 @@
 from __future__ import annotations
 import asyncio
 from collections import Counter
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Tuple
 import config as cfg
+from tqdm import tqdm
 
 from dspy_programs import (
     StrokePrediction,
@@ -328,36 +330,77 @@ async def label_full_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any
     return case
 
 
-async def label_cases(cases: List[Dict[str, Any]], max_concurrent: int = cfg.MAX_CONCURRENT_CASES) -> List[Dict[str, Any]]:
+async def label_cases(
+    cases: List[Dict[str, Any]],
+    max_concurrent: int = cfg.MAX_CONCURRENT_CASES,
+) -> List[Dict[str, Any]]:
     """
-    Label many cases concurrently.
+    Label all cases with a single-line dynamic progress bar.
 
-    Args:
-        cases:
-            A list of case dictionaries.
-
-        max_concurrent:
-            Maximum number of cases being labeled at once.
-
-    Returns:
-        A list of labeled cases.
-
-    Note:
-        Even though this function is async, DSPy itself is called through
-        asyncio.to_thread() because DSPy calls are synchronous.
+    The progress bar updates in place and includes the current date/time beside
+    the bar.  Because this pipeline runs cases concurrently, results are
+    returned as each case finishes, not necessarily in the original input order.
     """
-
-    # Configure DSPy and load optimized programs if available.
     initialize_dspy_programs()
 
-    # Limit concurrency so you do not overload Ollama or VRAM.
+    total_cases = len(cases)
+    if total_cases == 0:
+        return []
+
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    # Create one async task per case.
     tasks = [
-        label_full_case(case, semaphore=semaphore)
+        asyncio.create_task(label_full_case(case, semaphore))
         for case in cases
     ]
 
-    # Run all tasks and return results in the same order.
-    return await asyncio.gather(*tasks)
+    results: List[Dict[str, Any]] = []
+
+    def current_timestamp() -> str:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    progress_bar = tqdm(
+        total=total_cases,
+        desc="Labeling cases",
+        unit="case",
+        dynamic_ncols=True,
+        leave=True,
+        bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] | {postfix}",
+    )
+
+    # Initial date/time display before the first case completes.
+    progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
+
+    async def refresh_clock() -> None:
+        """
+        Refresh the date/time while cases are running.
+
+        This keeps the timestamp live even during long model calls.  It updates
+        the same tqdm line instead of printing new lines.
+        """
+        try:
+            while progress_bar.n < total_cases:
+                progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            return
+
+    clock_task = asyncio.create_task(refresh_clock())
+
+    try:
+        for completed_task in asyncio.as_completed(tasks):
+            result = await completed_task
+            results.append(result)
+            progress_bar.update(1)
+            progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
+    finally:
+        clock_task.cancel()
+        try:
+            await clock_task
+        except asyncio.CancelledError:
+            pass
+        progress_bar.set_postfix_str(f"finished={current_timestamp()}", refresh=True)
+        progress_bar.close()
+
+    return results
+
