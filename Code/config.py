@@ -39,7 +39,7 @@ OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 # File paths and run defaults
 # =============================================================================
 
-INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
+INPUT_REPORT_FILE = "Files/Report/New Reports.xlsx"
 OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
 GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
 TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"

@@ -1,0 +1,15 @@
+
+Label acute stroke-related vascular territory from CTA report text.
+
+Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+
+CTA-specific rules:
+- Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement.
+- Do not use RCA/LCA for carotid terminus.
+- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+  unless your project rules say they qualify.
