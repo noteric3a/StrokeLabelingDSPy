@@ -191,6 +191,19 @@ Report:
         )
 
 
+def _is_dspy_parse_error(exc: Exception) -> bool:
+    """Return True when DSPy failed because it could not parse the LM response."""
+    message = str(exc)
+    exc_type = type(exc).__name__
+    return (
+        "AdapterParseError" in exc_type
+        or "AdapterParseError" in message
+        or "empty or null response" in message
+        or "failed to parse" in message.lower()
+        or "Expected to find output fields" in message
+    )
+
+
 def _safe_program_call(program: Any, report_text: str, modality: str) -> StrokePrediction:
     """
     Call a DSPy program safely.
@@ -204,14 +217,7 @@ def _safe_program_call(program: Any, report_text: str, modality: str) -> StrokeP
         return prediction_to_result(pred)
     except Exception as exc:
         message = str(exc)
-        parse_like_error = (
-            "AdapterParseError" in message
-            or "empty or null response" in message
-            or "failed to parse" in message.lower()
-            or "Expected to find output fields" in message
-        )
-
-        if parse_like_error:
+        if _is_dspy_parse_error(exc):
             fallback = _direct_ollama_fallback(report_text or "", modality)
             fallback.reasoning = (
                 f"DSPy parse fallback used for {modality}. Original error: {message[:300]}\n\n"
@@ -414,34 +420,74 @@ def _load_or_create(name: str, cls):
 
 
 def initialize_dspy_programs() -> None:
+    """
+    Configure DSPy and load/create all programs.
+
+    Important fix:
+        cfg.DSPY_PROGRAM_NAMES stores save-file names like "ct_labeler",
+        but the label functions use simple runtime keys like "ct".
+
+        We store BOTH:
+            _PROGRAMS["ct_labeler"] -> CT program
+            _PROGRAMS["ct"]         -> same CT program
+
+        This prevents KeyError: 'ct'.
+    """
     configure_dspy()
-    _load_or_create(cfg.DSPY_PROGRAM_NAMES["CT"], CTLabeler)
-    _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTA"], CTALabeler)
-    _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTP"], CTPLabeler)
-    _load_or_create(cfg.DSPY_PROGRAM_NAMES["Combined"], CombinedLabeler)
+
+    ct_program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CT"], CTLabeler)
+    cta_program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTA"], CTALabeler)
+    ctp_program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTP"], CTPLabeler)
+    combined_program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["Combined"], CombinedLabeler)
+
+    # Runtime aliases used by label_ct / label_cta / label_ctp / label_combined.
+    _PROGRAMS["ct"] = ct_program
+    _PROGRAMS["cta"] = cta_program
+    _PROGRAMS["ctp"] = ctp_program
+    _PROGRAMS["combined"] = combined_program
+
+
+def _program_for(runtime_key: str, config_key: str, cls):
+    """
+    Return a loaded program safely.
+
+    This makes the public label_* functions robust even if someone calls them
+    directly without calling initialize_dspy_programs() first.
+    """
+    if runtime_key not in _PROGRAMS:
+        # If the runtime alias is missing, initialize everything.
+        initialize_dspy_programs()
+
+    if runtime_key in _PROGRAMS:
+        return _PROGRAMS[runtime_key]
+
+    # Final fallback: load/create from config save name and register alias.
+    program = _load_or_create(cfg.DSPY_PROGRAM_NAMES[config_key], cls)
+    _PROGRAMS[runtime_key] = program
+    return program
 
 
 def label_ct(report_text: str) -> StrokePrediction:
     """Label CT report text with DSPy, falling back to direct Ollama if parsing fails."""
-    program = _PROGRAMS["ct"]
+    program = _program_for("ct", "CT", CTLabeler)
     return _safe_program_call(program, report_text or "", "CT")
 
 
 def label_cta(report_text: str) -> StrokePrediction:
     """Label CTA report text with DSPy, falling back to direct Ollama if parsing fails."""
-    program = _PROGRAMS["cta"]
+    program = _program_for("cta", "CTA", CTALabeler)
     return _safe_program_call(program, report_text or "", "CTA")
 
 
 def label_ctp(report_text: str) -> StrokePrediction:
     """Label CTP report text with DSPy, falling back to direct Ollama if parsing fails."""
-    program = _PROGRAMS["ctp"]
+    program = _program_for("ctp", "CTP", CTPLabeler)
     return _safe_program_call(program, report_text or "", "CTP")
 
 
 def label_combined(case: Dict[str, Any]) -> StrokePrediction:
     """Label the final combined case with DSPy, falling back to direct Ollama if parsing fails."""
-    program = _PROGRAMS["combined"]
+    program = _program_for("combined", "Combined", CombinedLabeler)
 
     try:
         pred = program(
@@ -460,14 +506,7 @@ def label_combined(case: Dict[str, Any]) -> StrokePrediction:
 
     except Exception as exc:
         message = str(exc)
-        parse_like_error = (
-            "AdapterParseError" in message
-            or "empty or null response" in message
-            or "failed to parse" in message.lower()
-            or "Expected to find output fields" in message
-        )
-
-        if parse_like_error:
+        if _is_dspy_parse_error(exc):
             fallback = _direct_ollama_combined_fallback(case)
             fallback.reasoning = (
                 f"DSPy parse fallback used for Combined. Original error: {message[:300]}\\n\\n"
