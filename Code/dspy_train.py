@@ -431,23 +431,48 @@ def split_examples(examples: List[dspy.Example], seed: int = 42):
 # =============================================================================
 
 
-def evaluate(program, examples: List[dspy.Example], name: str) -> float:
+def evaluate(
+    program,
+    examples: List[dspy.Example],
+    name: str,
+    error_log_path: Optional[Path] = None,
+) -> float:
     """
     Evaluate a DSPy program on exact-match accuracy.
+
+    Important: local Ollama thinking models can occasionally return a response
+    that DSPy's adapter cannot parse. During evaluation, that should count as
+    a wrong answer instead of crashing the entire training run.
     """
 
     correct = 0
+    errors: List[Dict[str, Any]] = []
 
     for ex in examples:
-        pred = program(report_text=ex.report_text)
-
-        if exact_match_metric(ex, pred) == 1.0:
-            correct += 1
+        try:
+            pred = program(report_text=ex.report_text)
+            if exact_match_metric(ex, pred) == 1.0:
+                correct += 1
+        except Exception as exc:
+            errors.append({
+                "case_id": getattr(ex, "case_id", ""),
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:3000],
+                "ground_truth": getattr(ex, "labels", ""),
+            })
+            continue
 
     total = len(examples)
     acc = correct / total if total else 0.0
 
-    print(f"{name}: {correct}/{total} = {acc:.2%}")
+    if errors:
+        print(f"{name}: {correct}/{total} = {acc:.2%} ({len(errors)} parse/runtime errors counted as wrong)")
+        if error_log_path:
+            error_log_path.parent.mkdir(parents=True, exist_ok=True)
+            error_log_path.write_text(json.dumps(errors, indent=2), encoding="utf-8")
+            print(f"Saved {name} evaluation errors to {error_log_path}")
+    else:
+        print(f"{name}: {correct}/{total} = {acc:.2%}")
 
     return acc
 
@@ -563,7 +588,12 @@ def train_one(
         save_program(program, run_dir / "baseline_program.json")
 
     # Evaluate the unoptimized program first.
-    baseline_acc = evaluate(program, testset, f"{report_type} baseline")
+    baseline_acc = evaluate(
+        program,
+        testset,
+        f"{report_type} baseline",
+        error_log_path=(run_dir / "baseline_evaluation_errors.json") if run_dir else None,
+    )
 
     if run_dir:
         save_dspy_history(run_dir / "dspy_history_after_baseline_eval.txt", n=history_size)
@@ -572,17 +602,36 @@ def train_one(
     optimizer = get_optimizer(exact_match_metric)
 
     # Compile/optimize the program.
-    optimized_program = optimizer.compile(
-        program.deepcopy(),
-        trainset=trainset,
-        valset=devset,
-    )
+    try:
+        optimized_program = optimizer.compile(
+            program.deepcopy(),
+            trainset=trainset,
+            valset=devset,
+        )
+    except Exception as exc:
+        if run_dir:
+            save_dspy_history(run_dir / "dspy_history_after_compile_error.txt", n=history_size)
+            (run_dir / "compile_error.txt").write_text(
+                f"{type(exc).__name__}: {exc}",
+                encoding="utf-8",
+            )
+        raise RuntimeError(
+            "DSPy optimization failed during compile. The examples loaded correctly, "
+            "but the model/adapter failed while testing candidate prompts. "
+            "This is usually caused by truncated or unparsable model output. "
+            "Try increasing DSPY_MAX_TOKENS further or using a non-thinking Ollama model."
+        ) from exc
 
     if run_dir:
         save_dspy_history(run_dir / "dspy_history_after_compile.txt", n=history_size)
 
     # Evaluate optimized program.
-    optimized_acc = evaluate(optimized_program, testset, f"{report_type} optimized")
+    optimized_acc = evaluate(
+        optimized_program,
+        testset,
+        f"{report_type} optimized",
+        error_log_path=(run_dir / "optimized_evaluation_errors.json") if run_dir else None,
+    )
 
     if run_dir:
         save_dspy_history(run_dir / "dspy_history_after_optimized_eval.txt", n=history_size)

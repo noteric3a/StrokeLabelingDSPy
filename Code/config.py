@@ -23,7 +23,8 @@ from __future__ import annotations
 DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
-DSPY_MAX_TOKENS = 1200
+# DSPy needs enough room for local thinking models to finish the final structured answer.
+DSPY_MAX_TOKENS = 4096
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Compatibility values for ollama_client.py for testing purposes
@@ -33,13 +34,19 @@ REQUEST_TIMEOUT_SECONDS = 600
 NUM_PREDICT = DSPY_MAX_TOKENS
 NUM_CTX = 8192
 OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
+BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
+
+# When enabled, main.py writes each run into a unique timestamped folder.
+# Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
+USE_TIMESTAMPED_RUN_FOLDERS = True
+RUN_FOLDER_PREFIX = "run"
 
 
 # =============================================================================
 # File paths and run defaults
 # =============================================================================
 
-INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
+INPUT_REPORT_FILE = "Files/Report/New Reports.xlsx"
 # DSPy training can use a separate report-text workbook from the ground-truth key.
 # By default, use the same reports workbook as the main labeler.
 TRAINING_REPORTS_FILE = INPUT_REPORT_FILE
@@ -51,23 +58,6 @@ CACHE_FILE = "Files/.processing_cache.json"
 
 MAX_CONCURRENT_CASES = 4
 LAZY_EXCEL_CHUNK_SIZE = 50
-
-# =============================================================================
-# Timestamped run / logging defaults
-# =============================================================================
-
-# Keep each labeling experiment in its own timestamped folder so runs do not
-# overwrite each other. main.py uses these values by default.
-USE_TIMESTAMPED_RUN_FOLDERS = True
-RUN_OUTPUT_ROOT = "Files/Results/DSPy_Runs"
-RUN_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
-BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
-
-# DSPy optimization logging. dspy_train.py can repeatedly optimize until you
-# stop it and will save each iteration in its own timestamped folder.
-DSPY_OPTIMIZATION_LOG_DIR = "Files/Results/DSPy_Optimization_Runs"
-DSPY_TRAIN_LOOP_SLEEP_SECONDS = 0
-DSPY_INSPECT_HISTORY_N = 200
 
 
 # =============================================================================
