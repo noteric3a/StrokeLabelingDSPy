@@ -26,7 +26,7 @@ DSPY_TEMPERATURE = 0.2
 DSPY_MAX_TOKENS = 1200
 DSPY_PROGRAM_DIR = "optimized_programs"
 
-# Compatibility values for ollama_client.py, in case you still use it for tests.
+# Compatibility values for ollama_client.py for testing purposes
 MODEL_NAME = DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 REQUEST_TIMEOUT_SECONDS = 600
@@ -41,7 +41,7 @@ OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 
 INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
 OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
-GROUND_TRUTH_FILE = "Files/GT/Ground_truths.xlsx"
+GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
 TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"
 JSON_REPORT_FILE = "Files/Results/report_dspy.json"
 CACHE_FILE = "Files/.processing_cache.json"

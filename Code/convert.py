@@ -593,6 +593,41 @@ def _format_report_reasoning_columns(output_df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
+def _format_current_prompt_columns_for_display(output_df: pd.DataFrame) -> pd.DataFrame:
+    """Append active prompt/instruction columns to the Excel display DataFrame.
+
+    The DSPy version does not always store a literal prompt in each JSON case.
+    Instead, the active task instructions live in config.py as
+    CT_SIGNATURE_INSTRUCTIONS, CTA_SIGNATURE_INSTRUCTIONS, CTP_SIGNATURE_INSTRUCTIONS,
+    and COMBINED_SIGNATURE_INSTRUCTIONS.  This function copies those active
+    config prompts into the final spreadsheet so every output file records the
+    prompt/instruction context used for the run.
+    """
+    display_df = output_df.copy()
+
+    if not bool(getattr(cfg, "INCLUDE_CURRENT_PROMPT_COLUMNS", False)):
+        return display_df
+
+    prompt_columns = getattr(cfg, "CURRENT_PROMPT_COLUMNS", {})
+    if not isinstance(prompt_columns, dict) or not prompt_columns:
+        return display_df
+
+    for column_name, prompt_text in prompt_columns.items():
+        column_name = str(column_name).strip()
+        if not column_name:
+            continue
+
+        # Clean prompt text for spreadsheet display but do not treat "NONE" as
+        # blank here because a prompt may legitimately mention the NONE label.
+        prompt = "" if prompt_text is None else str(prompt_text).strip()
+        if column_name in display_df.columns:
+            display_df[column_name] = prompt
+        else:
+            display_df[column_name] = prompt
+
+    return display_df
+
+
 # ---------------------------------------------------------------------------
 # Cell-level review highlighting helpers
 # ---------------------------------------------------------------------------
@@ -1014,7 +1049,7 @@ def style_excel_sheet(
     report_reasoning_col_indexes = {
         col_idx
         for header, col_idx in header_to_col.items()
-        if "Report/Reasoning" in header
+        if "Report/Reasoning" in header or "Current Prompt" in header
     }
 
     def column_name_map_to_indexes(cells_by_row: dict[int, set[str]]) -> dict[int, set[int]]:
@@ -1106,8 +1141,8 @@ def style_excel_sheet(
             except Exception:
                 pass
 
-        # Set width with some padding. Report/Reasoning columns are intentionally
-        # wider because they contain the report text followed by model reasoning.
+        # Set width with some padding. Report/Reasoning and Current Prompt columns are intentionally
+        # wider because they contain long report/reasoning or prompt text.
         if col_idx in report_reasoning_col_indexes:
             adjusted_width = 90
         else:
@@ -1182,6 +1217,7 @@ def convert(
     # merge vote_count + total_votes into one n/total column.
     display_base_df = _format_confidence_columns_for_display(df)
     display_df = _format_report_reasoning_columns(display_base_df)
+    display_df = _format_current_prompt_columns_for_display(display_df)
 
     if out_path is None:
         out = src.with_suffix(".xlsx") if fmt == "xlsx" else src.with_suffix(".csv")
