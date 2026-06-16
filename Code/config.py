@@ -23,7 +23,7 @@ from __future__ import annotations
 DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
-DSPY_MAX_TOKENS = 1200
+DSPY_MAX_TOKENS = 8192
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Compatibility values for ollama_client.py for testing purposes
@@ -39,7 +39,7 @@ OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 # File paths and run defaults
 # =============================================================================
 
-INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
+INPUT_REPORT_FILE = "Files/Report/New Reports.xlsx"
 OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
 GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
 TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"
