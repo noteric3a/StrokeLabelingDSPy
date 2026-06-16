@@ -1,0 +1,1669 @@
+{
+  "summary": {
+    "CT_GT": {
+      "correct": 36,
+      "total": 40,
+      "accuracy": 90.0
+    },
+    "CTA_GT": {
+      "correct": 25,
+      "total": 40,
+      "accuracy": 62.5
+    },
+    "CTP_GT": {
+      "correct": 37,
+      "total": 40,
+      "accuracy": 92.5
+    },
+    "Combined_GT": {
+      "correct": 12,
+      "total": 40,
+      "accuracy": 30.0
+    }
+  },
+  "overall_accuracy": 68.8,
+  "field_results": {
+    "CT_GT": {
+      "correct": 36,
+      "total": 40,
+      "details": [
+        {
+          "case_id": "023691702_20250813_16293200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "009444068_20210906_00284700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "030953939_20230512_09252300",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "020174066_20210626_20311800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109991449_20231231_08440600",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "108788833_20230828_06075500",
+          "generated": [
+            "LPCA"
+          ],
+          "ground_truth": [
+            "LPCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110893340_20241119_09580800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "031756273_20230516_12120100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "000365718_20220216_00165000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "generated": [
+            "LACA",
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110120573_20220204_18010500",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041244179_20230521_12422300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "020034013_20230531_13443300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023051824_20241130_13040900",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110655124_20240105_18302700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110806095_20240729_18595400",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023980980_20250315_06184100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109509469_20241016_14211000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "016558066_20210526_10195300",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110843924_20240916_23200800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109380776_20240924_17553700",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "010965184_20221208_09301000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110017328_20250719_09543300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "037460599_20250831_06581000",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109694670_20210309_22443200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "103803581_20241130_20052800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "025194804_20250505_15314300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "018146324_20221108_20503800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110697720_20240303_06460500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109937236_20210812_23304300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041172966_20240202_02254100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "029003746_20220922_14520000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110795508_20240716_02562300",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110826984_20240826_08171200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "034597583_20210124_14400000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023295611_20211221_14525200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LPCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "013938063_20250729_08000900",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "007814569_20210706_13274400",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        }
+      ]
+    },
+    "CTA_GT": {
+      "correct": 25,
+      "total": 40,
+      "details": [
+        {
+          "case_id": "023691702_20250813_16293200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "009444068_20210906_00284700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "030953939_20230512_09252300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "020174066_20210626_20311800",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109991449_20231231_08440600",
+          "generated": [
+            "LMCA",
+            "RPCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "108788833_20230828_06075500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110893340_20241119_09580800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "031756273_20230516_12120100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "000365718_20220216_00165000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RICA",
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110120573_20220204_18010500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041244179_20230521_12422300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "020034013_20230531_13443300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023051824_20241130_13040900",
+          "generated": [
+            "LACA",
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110655124_20240105_18302700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110806095_20240729_18595400",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023980980_20250315_06184100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109509469_20241016_14211000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "016558066_20210526_10195300",
+          "generated": [
+            "LMCA",
+            "RMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110843924_20240916_23200800",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "generated": [
+            "LMCA",
+            "RMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109380776_20240924_17553700",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "010965184_20221208_09301000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110017328_20250719_09543300",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "037460599_20250831_06581000",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109694670_20210309_22443200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "103803581_20241130_20052800",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "025194804_20250505_15314300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "018146324_20221108_20503800",
+          "generated": [
+            "LPCA",
+            "RMCA"
+          ],
+          "ground_truth": [
+            "LPCA",
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110697720_20240303_06460500",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109937236_20210812_23304300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041172966_20240202_02254100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "029003746_20220922_14520000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110795508_20240716_02562300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110826984_20240826_08171200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "034597583_20210124_14400000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA",
+            "RPCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "023295611_20211221_14525200",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "013938063_20250729_08000900",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA",
+            "RACA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "007814569_20210706_13274400",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": false
+        }
+      ]
+    },
+    "CTP_GT": {
+      "correct": 37,
+      "total": 40,
+      "details": [
+        {
+          "case_id": "023691702_20250813_16293200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "009444068_20210906_00284700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "030953939_20230512_09252300",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "020174066_20210626_20311800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109991449_20231231_08440600",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "108788833_20230828_06075500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LPCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110893340_20241119_09580800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "031756273_20230516_12120100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "000365718_20220216_00165000",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LPICA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110120573_20220204_18010500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041244179_20230521_12422300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "020034013_20230531_13443300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023051824_20241130_13040900",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110655124_20240105_18302700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110806095_20240729_18595400",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023980980_20250315_06184100",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109509469_20241016_14211000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "016558066_20210526_10195300",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110843924_20240916_23200800",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109380776_20240924_17553700",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "010965184_20221208_09301000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110017328_20250719_09543300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "037460599_20250831_06581000",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109694670_20210309_22443200",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "103803581_20241130_20052800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "025194804_20250505_15314300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "018146324_20221108_20503800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110697720_20240303_06460500",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109937236_20210812_23304300",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "041172966_20240202_02254100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "029003746_20220922_14520000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110795508_20240716_02562300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110826984_20240826_08171200",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "034597583_20210124_14400000",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "023295611_20211221_14525200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "013938063_20250729_08000900",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "007814569_20210706_13274400",
+          "generated": [
+            "LMCA"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": false
+        }
+      ]
+    },
+    "Combined_GT": {
+      "correct": 12,
+      "total": 40,
+      "details": [
+        {
+          "case_id": "023691702_20250813_16293200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "009444068_20210906_00284700",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "030953939_20230512_09252300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "020174066_20210626_20311800",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109991449_20231231_08440600",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "108788833_20230828_06075500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LPCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110893340_20241119_09580800",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "031756273_20230516_12120100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "000365718_20220216_00165000",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110120573_20220204_18010500",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "041244179_20230521_12422300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "020034013_20230531_13443300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "023051824_20241130_13040900",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110655124_20240105_18302700",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110806095_20240729_18595400",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "023980980_20250315_06184100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109509469_20241016_14211000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "016558066_20210526_10195300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110843924_20240916_23200800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109380776_20240924_17553700",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "010965184_20221208_09301000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110017328_20250719_09543300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "037460599_20250831_06581000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "109694670_20210309_22443200",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "103803581_20241130_20052800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "025194804_20250505_15314300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "018146324_20221108_20503800",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110697720_20240303_06460500",
+          "generated": [
+            "RMCA"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "109937236_20210812_23304300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "041172966_20240202_02254100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "029003746_20220922_14520000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": true
+        },
+        {
+          "case_id": "110795508_20240716_02562300",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "110826984_20240826_08171200",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "034597583_20210124_14400000",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "RMCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "023295611_20211221_14525200",
+          "generated": [
+            "BA"
+          ],
+          "ground_truth": [
+            "NONE"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LPCA",
+            "RPCA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "013938063_20250729_08000900",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LMCA",
+            "RACA"
+          ],
+          "match": false
+        },
+        {
+          "case_id": "007814569_20210706_13274400",
+          "generated": [
+            "NONE"
+          ],
+          "ground_truth": [
+            "LACA",
+            "LMCA"
+          ],
+          "match": false
+        }
+      ]
+    }
+  }
+}
