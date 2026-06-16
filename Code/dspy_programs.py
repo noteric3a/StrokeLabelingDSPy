@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
+import json
+import re
 
 import dspy
 
@@ -50,6 +52,242 @@ def prediction_to_result(pred: Any) -> StrokePrediction:
     if not reasoning:
         reasoning = "No reasoning returned by DSPy program."
     return StrokePrediction(labels=labels, reasoning=reasoning)
+
+
+
+
+# =============================================================================
+# Fallback helpers for DSPy adapter parse failures
+# =============================================================================
+
+def _json_from_text(text: str) -> Dict[str, Any] | None:
+    """
+    Extract a JSON object from text.
+
+    This is intentionally defensive because local thinking models may sometimes
+    wrap JSON in extra text even when asked for structured output.
+    """
+    if not text:
+        return None
+
+    text = str(text).strip()
+
+    # Direct JSON object.
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    # First {...} block.
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    if match:
+        try:
+            parsed = json.loads(match.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+    return None
+
+
+def _labels_from_reasoning_text(text: str) -> List[str]:
+    """
+    Last-resort label extraction from reasoning_content or plain text.
+
+    This prevents a full crash when the model clearly states labels but DSPy
+    receives an empty JSON response.
+    """
+    if not text:
+        return ["NONE"]
+
+    # Prefer explicit "Labels: ..." line when present.
+    labels_match = re.search(
+        r"(?:final\s+labels?|labels?|output)\s*:\s*([A-Z,\s]+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if labels_match:
+        return clean_labels(labels_match.group(1))
+
+    # Otherwise, extract allowed labels mentioned anywhere.
+    found = []
+    upper = text.upper()
+    for label in cfg.ALLOWED_LABELS:
+        if label == "NONE":
+            continue
+        if re.search(rf"\b{re.escape(label)}\b", upper):
+            found.append(label)
+
+    return clean_labels(found or ["NONE"])
+
+
+def _direct_ollama_fallback(report_text: str, modality: str) -> StrokePrediction:
+    """
+    Retry the failed DSPy call through the direct Ollama client.
+
+    Why this exists:
+        Some Ollama thinking models occasionally return an empty final "text"
+        field while putting the useful answer in reasoning_content. DSPy's
+        JSONAdapter cannot parse that and raises AdapterParseError.
+
+        The direct Ollama client uses think=False and a JSON schema, which is
+        more reliable for this labeling task.
+    """
+    try:
+        from ollama_client import ollama_generate_sync
+        from schemas import SINGLE_MODALITY_SCHEMA
+
+        instruction_map = {
+            "CT": cfg.CT_SIGNATURE_INSTRUCTIONS,
+            "CTA": cfg.CTA_SIGNATURE_INSTRUCTIONS,
+            "CTP": cfg.CTP_SIGNATURE_INSTRUCTIONS,
+        }
+
+        instruction = instruction_map.get(modality, "")
+        prompt = f"""
+You are labeling acute stroke-related vascular territories.
+
+{instruction}
+
+Return ONLY valid JSON matching this shape:
+{{
+  "case_id": "fallback",
+  "modality": "{modality}",
+  "labels": ["NONE"],
+  "reasoning": "brief reason"
+}}
+
+Report:
+{report_text or ""}
+"""
+
+        raw = ollama_generate_sync(
+            prompt=prompt,
+            schema=SINGLE_MODALITY_SCHEMA,
+            case_id="fallback",
+            tag=f"DSPY_{modality}_FALLBACK",
+            temperature=cfg.DSPY_TEMPERATURE,
+        )
+
+        parsed = _json_from_text(raw)
+        if parsed:
+            return StrokePrediction(
+                labels=clean_labels(parsed.get("labels", "NONE")),
+                reasoning=str(parsed.get("reasoning", "Recovered by direct Ollama fallback.")).strip(),
+            )
+
+        return StrokePrediction(
+            labels=_labels_from_reasoning_text(raw),
+            reasoning="Recovered labels from direct Ollama fallback text because JSON parsing failed.",
+        )
+
+    except Exception as fallback_error:
+        return StrokePrediction(
+            labels=["NONE"],
+            reasoning=f"DSPy call failed and direct fallback also failed: {fallback_error}",
+        )
+
+
+def _safe_program_call(program: Any, report_text: str, modality: str) -> StrokePrediction:
+    """
+    Call a DSPy program safely.
+
+    If DSPy succeeds, return the DSPy prediction.
+    If DSPy fails because the adapter cannot parse the model response, retry
+    through the direct Ollama fallback instead of crashing the entire run.
+    """
+    try:
+        pred = program(report_text=report_text or "")
+        return prediction_to_result(pred)
+    except Exception as exc:
+        message = str(exc)
+        parse_like_error = (
+            "AdapterParseError" in message
+            or "empty or null response" in message
+            or "failed to parse" in message.lower()
+            or "Expected to find output fields" in message
+        )
+
+        if parse_like_error:
+            fallback = _direct_ollama_fallback(report_text or "", modality)
+            fallback.reasoning = (
+                f"DSPy parse fallback used for {modality}. Original error: {message[:300]}\n\n"
+                f"{fallback.reasoning}"
+            )
+            return fallback
+
+        raise
+
+
+def _direct_ollama_combined_fallback(case: Dict[str, Any]) -> StrokePrediction:
+    """Direct Ollama fallback for Combined labeling."""
+    try:
+        from ollama_client import ollama_generate_sync
+        from schemas import COMBINED_SCHEMA
+
+        prompt = f"""
+You are creating the final Combined_GT stroke-territory label.
+
+{cfg.COMBINED_SIGNATURE_INSTRUCTIONS}
+
+Return ONLY valid JSON matching this shape:
+{{
+  "case_id": "{case.get('case_id', 'fallback')}",
+  "Combined_GT": ["NONE"],
+  "reasoning": "brief reason"
+}}
+
+CT report:
+{case.get("New_CT_Report") or case.get("CT_Report") or ""}
+
+CTA report:
+{case.get("CTA_Report") or ""}
+
+CTP report:
+{case.get("CTP_Report") or ""}
+
+MRI report:
+{case.get("MRI_Report") or ""}
+
+Already predicted modality labels:
+CT: {case.get("CT_GT", ["NONE"])}
+CTA: {case.get("CTA_GT", ["NONE"])}
+CTP: {case.get("CTP_GT", ["NONE"])}
+
+Modality reasoning:
+CT: {case.get("CT_GT_reasoning", "")}
+CTA: {case.get("CTA_GT_reasoning", "")}
+CTP: {case.get("CTP_GT_reasoning", "")}
+"""
+
+        raw = ollama_generate_sync(
+            prompt=prompt,
+            schema=COMBINED_SCHEMA,
+            case_id=str(case.get("case_id", "fallback")),
+            tag="DSPY_COMBINED_FALLBACK",
+            temperature=cfg.DSPY_TEMPERATURE,
+        )
+
+        parsed = _json_from_text(raw)
+        if parsed:
+            return StrokePrediction(
+                labels=clean_labels(parsed.get("Combined_GT", parsed.get("labels", "NONE"))),
+                reasoning=str(parsed.get("reasoning", "Recovered by direct Ollama fallback.")).strip(),
+            )
+
+        return StrokePrediction(
+            labels=_labels_from_reasoning_text(raw),
+            reasoning="Recovered combined labels from direct Ollama fallback text because JSON parsing failed.",
+        )
+
+    except Exception as fallback_error:
+        return StrokePrediction(
+            labels=["NONE"],
+            reasoning=f"DSPy combined call failed and direct fallback also failed: {fallback_error}",
+        )
 
 
 class CTStrokeSignature(dspy.Signature):
@@ -184,38 +422,57 @@ def initialize_dspy_programs() -> None:
 
 
 def label_ct(report_text: str) -> StrokePrediction:
-    program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CT"], CTLabeler)
-    pred = program(report_text=report_text or "")
-    return prediction_to_result(pred)
+    """Label CT report text with DSPy, falling back to direct Ollama if parsing fails."""
+    program = _PROGRAMS["ct"]
+    return _safe_program_call(program, report_text or "", "CT")
 
 
 def label_cta(report_text: str) -> StrokePrediction:
-    program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTA"], CTALabeler)
-    pred = program(report_text=report_text or "")
-    return prediction_to_result(pred)
+    """Label CTA report text with DSPy, falling back to direct Ollama if parsing fails."""
+    program = _PROGRAMS["cta"]
+    return _safe_program_call(program, report_text or "", "CTA")
 
 
 def label_ctp(report_text: str) -> StrokePrediction:
-    program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["CTP"], CTPLabeler)
-    pred = program(report_text=report_text or "")
-    return prediction_to_result(pred)
+    """Label CTP report text with DSPy, falling back to direct Ollama if parsing fails."""
+    program = _PROGRAMS["ctp"]
+    return _safe_program_call(program, report_text or "", "CTP")
 
 
 def label_combined(case: Dict[str, Any]) -> StrokePrediction:
-    program = _load_or_create(cfg.DSPY_PROGRAM_NAMES["Combined"], CombinedLabeler)
-    ct_labels = ", ".join(clean_labels(case.get("CT_GT", ["NONE"])))
-    cta_labels = ", ".join(clean_labels(case.get("CTA_GT", ["NONE"])))
-    ctp_labels = ", ".join(clean_labels(case.get("CTP_GT", ["NONE"])))
-    pred = program(
-        ct_report=str(case.get("New_CT_Report") or case.get("CT_Report") or ""),
-        cta_report=str(case.get("CTA_Report") or ""),
-        ctp_report=str(case.get("CTP_Report") or ""),
-        mri_report=str(case.get("MRI_Report") or ""),
-        ct_labels=ct_labels,
-        cta_labels=cta_labels,
-        ctp_labels=ctp_labels,
-        ct_reasoning=str(case.get("CT_GT_reasoning") or ""),
-        cta_reasoning=str(case.get("CTA_GT_reasoning") or ""),
-        ctp_reasoning=str(case.get("CTP_GT_reasoning") or ""),
-    )
-    return prediction_to_result(pred)
+    """Label the final combined case with DSPy, falling back to direct Ollama if parsing fails."""
+    program = _PROGRAMS["combined"]
+
+    try:
+        pred = program(
+            ct_report=case.get("New_CT_Report") or case.get("CT_Report") or "",
+            cta_report=case.get("CTA_Report") or "",
+            ctp_report=case.get("CTP_Report") or "",
+            mri_report=case.get("MRI_Report") or "",
+            ct_labels=", ".join(case.get("CT_GT", ["NONE"])),
+            cta_labels=", ".join(case.get("CTA_GT", ["NONE"])),
+            ctp_labels=", ".join(case.get("CTP_GT", ["NONE"])),
+            ct_reasoning=case.get("CT_GT_reasoning", ""),
+            cta_reasoning=case.get("CTA_GT_reasoning", ""),
+            ctp_reasoning=case.get("CTP_GT_reasoning", ""),
+        )
+        return prediction_to_result(pred)
+
+    except Exception as exc:
+        message = str(exc)
+        parse_like_error = (
+            "AdapterParseError" in message
+            or "empty or null response" in message
+            or "failed to parse" in message.lower()
+            or "Expected to find output fields" in message
+        )
+
+        if parse_like_error:
+            fallback = _direct_ollama_combined_fallback(case)
+            fallback.reasoning = (
+                f"DSPy parse fallback used for Combined. Original error: {message[:300]}\\n\\n"
+                f"{fallback.reasoning}"
+            )
+            return fallback
+
+        raise
