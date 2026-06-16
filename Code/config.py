@@ -23,7 +23,7 @@ from __future__ import annotations
 DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
-DSPY_MAX_TOKENS = 8192
+DSPY_MAX_TOKENS = 1200
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Compatibility values for ollama_client.py for testing purposes
@@ -39,7 +39,7 @@ OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 # File paths and run defaults
 # =============================================================================
 
-INPUT_REPORT_FILE = "Files/Report/New Reports.xlsx"
+INPUT_REPORT_FILE = "Files/Report/Filtered_Reports.xlsx"
 OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
 GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
 TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"
@@ -48,6 +48,23 @@ CACHE_FILE = "Files/.processing_cache.json"
 
 MAX_CONCURRENT_CASES = 4
 LAZY_EXCEL_CHUNK_SIZE = 50
+
+# =============================================================================
+# Timestamped run / logging defaults
+# =============================================================================
+
+# Keep each labeling experiment in its own timestamped folder so runs do not
+# overwrite each other. main.py uses these values by default.
+USE_TIMESTAMPED_RUN_FOLDERS = True
+RUN_OUTPUT_ROOT = "Files/Results/DSPy_Runs"
+RUN_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
+BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
+
+# DSPy optimization logging. dspy_train.py can repeatedly optimize until you
+# stop it and will save each iteration in its own timestamped folder.
+DSPY_OPTIMIZATION_LOG_DIR = "Files/Results/DSPy_Optimization_Runs"
+DSPY_TRAIN_LOOP_SLEEP_SECONDS = 0
+DSPY_INSPECT_HISTORY_N = 200
 
 
 # =============================================================================

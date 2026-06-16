@@ -35,7 +35,12 @@ Then main_dspy.py will automatically try to load that saved program.
 
 from __future__ import annotations
 import argparse
+import contextlib
+import io
+import json
 import random
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Set
 import dspy
@@ -278,14 +283,96 @@ def evaluate(program, examples: List[dspy.Example], name: str) -> float:
     return acc
 
 
+
+# =============================================================================
+# Optimization logging helpers
+# =============================================================================
+
+def timestamp() -> str:
+    return datetime.now().strftime(getattr(cfg, "RUN_TIMESTAMP_FORMAT", "%Y%m%d_%H%M%S"))
+
+
+def make_optimization_run_dir(report_type: str, iteration: int | None = None) -> Path:
+    """Create a timestamped folder for one DSPy optimization attempt."""
+    base = Path(getattr(cfg, "DSPY_OPTIMIZATION_LOG_DIR", "Files/Results/DSPy_Optimization_Runs"))
+    name = timestamp()
+    if iteration is not None:
+        name = f"{name}_iter_{iteration:04d}"
+    run_dir = base / report_type.upper() / name
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def save_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def save_json_file(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def save_program_snapshot(program, path: Path) -> None:
+    """Save a DSPy program snapshot, falling back to repr if save() fails."""
+    try:
+        program.save(str(path))
+    except Exception as exc:
+        save_text(path.with_suffix(".txt"), f"Could not save DSPy program as JSON: {exc}\n\n{repr(program)}")
+
+
+def dump_dspy_history(path: Path) -> None:
+    """Save DSPy's visible LM interaction history for prompt-audit/debugging."""
+    n = int(getattr(cfg, "DSPY_INSPECT_HISTORY_N", 200))
+    buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            result = dspy.inspect_history(n=n)
+        text = buffer.getvalue()
+        if result is not None:
+            text += "\n" + str(result)
+        if not text.strip():
+            text = "DSPy inspect_history returned no visible history for this version/configuration."
+    except Exception as exc:
+        text = f"Could not inspect DSPy history: {repr(exc)}"
+    save_text(path, text)
+
+
+def instruction_text_for(report_type: str) -> str:
+    report_type = report_type.upper()
+    if report_type == "CT":
+        return cfg.CT_SIGNATURE_INSTRUCTIONS
+    if report_type == "CTA":
+        return cfg.CTA_SIGNATURE_INSTRUCTIONS
+    if report_type == "CTP":
+        return cfg.CTP_SIGNATURE_INSTRUCTIONS
+    return ""
+
+
 # =============================================================================
 # Training one modality
 # =============================================================================
 
-def train_one(report_type: str, ground_truth_file: str, max_cases: int | None = None):
+def train_one(
+    report_type: str,
+    ground_truth_file: str,
+    max_cases: int | None = None,
+    *,
+    run_dir: Path | None = None,
+    iteration: int | None = None,
+):
     """
     Optimize one modality-specific DSPy program.
+
+    When run_dir is provided, this also logs the base instructions, baseline
+    program, optimized program, DSPy LM history, and summary metrics for the
+    experiment run.
     """
+
+    report_type = report_type.upper()
+    run_dir = run_dir or make_optimization_run_dir(report_type, iteration)
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     # Configure the Ollama model through DSPy.
     configure_dspy()
@@ -315,35 +402,85 @@ def train_one(report_type: str, ground_truth_file: str, max_cases: int | None = 
 
     print(f"\nTraining {report_type}")
     print(f"Train: {len(trainset)} | Dev: {len(devset)} | Test: {len(testset)}")
+    print(f"Optimization log folder: {run_dir}")
+
+    save_text(run_dir / "base_signature_instructions.txt", instruction_text_for(report_type))
+    save_program_snapshot(program, run_dir / "baseline_program.json")
 
     # Evaluate the unoptimized program first.
-    evaluate(program, testset, f"{report_type} baseline")
+    baseline_accuracy = evaluate(program, testset, f"{report_type} baseline")
+    dump_dspy_history(run_dir / "dspy_history_after_baseline_eval.txt")
 
     # Create optimizer.
     optimizer = get_optimizer(exact_match_metric)
 
     # Compile/optimize the program.
-    #
-    # Depending on DSPy version, compile() may accept trainset and valset.
-    # If your installed version errors here, check your DSPy version and
-    # adjust according to the current DSPy docs.
     optimized_program = optimizer.compile(
         program.deepcopy(),
         trainset=trainset,
         valset=devset,
     )
+    dump_dspy_history(run_dir / "dspy_history_after_compile.txt")
 
     # Evaluate optimized program.
-    evaluate(optimized_program, testset, f"{report_type} optimized")
+    optimized_accuracy = evaluate(optimized_program, testset, f"{report_type} optimized")
+    dump_dspy_history(run_dir / "dspy_history_after_optimized_eval.txt")
 
-    # Save optimized program.
+    # Save optimized program to the normal active DSPy program directory.
     Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
     save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
-
     optimized_program.save(str(save_path))
 
-    print(f"Saved optimized {report_type} program to {save_path}")
+    # Also save a timestamped snapshot so no iteration is lost.
+    save_program_snapshot(optimized_program, run_dir / "optimized_program.json")
 
+    summary = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "iteration": iteration,
+        "report_type": report_type,
+        "ground_truth_file": ground_truth_file,
+        "max_cases": max_cases,
+        "train_examples": len(trainset),
+        "dev_examples": len(devset),
+        "test_examples": len(testset),
+        "baseline_accuracy": baseline_accuracy,
+        "optimized_accuracy": optimized_accuracy,
+        "active_saved_program": str(save_path),
+        "timestamped_run_dir": str(run_dir),
+        "note": (
+            "This folder preserves the final optimized program for this iteration and "
+            "the visible DSPy LM prompt/history via dspy.inspect_history. Some DSPy "
+            "versions do not expose every discarded internal candidate prompt directly."
+        ),
+    }
+    save_json_file(run_dir / "optimization_summary.json", summary)
+
+    print(f"Saved active optimized {report_type} program to {save_path}")
+    print(f"Saved timestamped optimization logs to {run_dir}")
+    return summary
+
+
+def train_loop(
+    report_type: str,
+    ground_truth_file: str,
+    max_cases: int | None = None,
+    sleep_seconds: float = 0,
+) -> None:
+    """Keep optimizing repeatedly until the user stops the process with Ctrl+C."""
+    iteration = 1
+    print("Running continuous DSPy optimization. Press Ctrl+C to stop.")
+    while True:
+        run_dir = make_optimization_run_dir(report_type, iteration)
+        train_one(
+            report_type=report_type,
+            ground_truth_file=ground_truth_file,
+            max_cases=max_cases,
+            run_dir=run_dir,
+            iteration=iteration,
+        )
+        iteration += 1
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
 
 # =============================================================================
 # Command-line entry point
@@ -376,13 +513,37 @@ def main():
         help="Optional number of cases for faster testing.",
     )
 
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Keep running optimization attempts until stopped with Ctrl+C.",
+    )
+
+    parser.add_argument(
+        "--sleep-seconds",
+        type=float,
+        default=getattr(cfg, "DSPY_TRAIN_LOOP_SLEEP_SECONDS", 0),
+        help="Seconds to pause between looped optimization attempts.",
+    )
+
     args = parser.parse_args()
 
-    train_one(
-        report_type=args.report_type,
-        ground_truth_file=args.ground_truth,
-        max_cases=args.max_cases,
-    )
+    try:
+        if args.loop:
+            train_loop(
+                report_type=args.report_type,
+                ground_truth_file=args.ground_truth,
+                max_cases=args.max_cases,
+                sleep_seconds=args.sleep_seconds,
+            )
+        else:
+            train_one(
+                report_type=args.report_type,
+                ground_truth_file=args.ground_truth,
+                max_cases=args.max_cases,
+            )
+    except KeyboardInterrupt:
+        print("\nStopped continuous DSPy optimization.")
 
 
 if __name__ == "__main__":

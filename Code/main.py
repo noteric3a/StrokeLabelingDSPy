@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -96,6 +97,52 @@ def save_json(cases: List[Dict[str, Any]], output_path: str) -> None:
         json.dump(cases, f, indent=2)
 
 
+def create_timestamped_run_paths(args) -> tuple[str, str, str, Path | None]:
+    """Return output/report paths, optionally inside a timestamped run folder."""
+    timestamped = bool(getattr(cfg, "USE_TIMESTAMPED_RUN_FOLDERS", True)) and not args.no_timestamped_output
+    if not timestamped:
+        return args.output, cfg.TEXT_REPORT_FILE, cfg.JSON_REPORT_FILE, None
+
+    run_stamp = datetime.now().strftime(getattr(cfg, "RUN_TIMESTAMP_FORMAT", "%Y%m%d_%H%M%S"))
+    run_dir = Path(getattr(cfg, "RUN_OUTPUT_ROOT", "Files/Results/DSPy_Runs")) / run_stamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = run_dir / Path(args.output).name
+    text_report_path = run_dir / Path(cfg.TEXT_REPORT_FILE).name
+    json_report_path = run_dir / Path(cfg.JSON_REPORT_FILE).name
+
+    # Redirect logs into the same run folder so each test run is self-contained.
+    cfg.OLLAMA_WRAPPER_LOG = str(run_dir / "ollama_wrapper_log.jsonl")
+    cfg.BAD_JSON_LOG = str(run_dir / "bad_json_log.jsonl")
+
+    return str(output_path), str(text_report_path), str(json_report_path), run_dir
+
+
+def save_run_metadata(run_dir: Path | None, args, *, output_path: str, text_report_path: str, json_report_path: str) -> None:
+    """Write a small metadata file describing this experiment run."""
+    if run_dir is None:
+        return
+
+    metadata = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "input": args.input,
+        "output_json": output_path,
+        "ground_truth": args.ground_truth or "",
+        "text_report": text_report_path,
+        "json_report": json_report_path,
+        "max_concurrent": args.max_concurrent,
+        "model": cfg.DSPY_MODEL,
+        "temperature": cfg.DSPY_TEMPERATURE,
+        "max_tokens": cfg.DSPY_MAX_TOKENS,
+        "confidence_enabled": cfg.ENABLE_CONFIDENCE_CHECKING,
+        "confidence_attempts": cfg.CONFIDENCE_ATTEMPTS,
+        "confidence_threshold_percentage": cfg.CONFIDENCE_THRESHOLD_PERCENTAGE,
+        "ct_sanitization_restored": True,
+    }
+    with (run_dir / "run_metadata.json").open("w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2)
+
+
 async def main() -> None:
     """Main async entry point."""
     parser = argparse.ArgumentParser(description="Run DSPy stroke labeling.")
@@ -125,13 +172,22 @@ async def main() -> None:
         help=f"Maximum number of cases to process at the same time. Default: {cfg.MAX_CONCURRENT_CASES}",
     )
 
+    parser.add_argument(
+        "--no-timestamped-output",
+        action="store_true",
+        help="Disable timestamped run folders and write exactly to --output/config report paths.",
+    )
+
     args = parser.parse_args()
+    output_path, text_report_path, json_report_path, run_dir = create_timestamped_run_paths(args)
 
     print("Running DSPy stroke labeling with:")
     print(f"  input:          {args.input}")
-    print(f"  output:         {args.output}")
+    print(f"  output:         {output_path}")
     print(f"  ground truth:   {args.ground_truth or '<none>'}")
     print(f"  max concurrent: {args.max_concurrent}")
+    if run_dir is not None:
+        print(f"  run folder:     {run_dir}")
 
     cases = load_cases_from_excel(args.input)
     print(f"Loaded {len(cases)} cases.")
@@ -141,18 +197,19 @@ async def main() -> None:
         max_concurrent=args.max_concurrent,
     )
 
-    save_json(labeled, args.output)
-    print(f"Saved labeled cases to {args.output}")
+    save_json(labeled, output_path)
+    save_run_metadata(run_dir, args, output_path=output_path, text_report_path=text_report_path, json_report_path=json_report_path)
+    print(f"Saved labeled cases to {output_path}")
 
     # Run validation/conversion if a ground-truth path is configured or provided.
     # validate.py safely skips validation if the file is missing or blank, but
     # still attempts JSON -> Excel conversion.
     if args.ground_truth:
         check_answers(
-            json_file=args.output,
+            json_file=output_path,
             ground_truth_file=args.ground_truth,
-            report_path=cfg.TEXT_REPORT_FILE,
-            json_report_path=cfg.JSON_REPORT_FILE,
+            report_path=text_report_path,
+            json_report_path=json_report_path,
         )
 
 
