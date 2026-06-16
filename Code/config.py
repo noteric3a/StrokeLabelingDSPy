@@ -82,15 +82,15 @@ REPORT_COLUMN_CANDIDATES = {
 
 TRAINING_COLUMN_CANDIDATES = {
     "CT": {
-        "report": ["CT Report", "CT_Report", "CT text", "CT_Text"],
+        "report": ["CT Report", "CT_Report", "CT text", "CT_Text", "CT"],
         "ground_truth": ["CT GT", "CT_GT", "CT"],
     },
     "CTA": {
-        "report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text"],
+        "report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text", "CTA"],
         "ground_truth": ["CTA GT", "CTA_GT", "CTA"],
     },
     "CTP": {
-        "report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text"],
+        "report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text", "CTP"],
         "ground_truth": ["CTP GT", "CTP_GT", "CTP"],
     },
 }
