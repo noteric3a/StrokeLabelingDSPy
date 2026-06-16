@@ -33,27 +33,16 @@ That means your red/yellow flags should still work.
 """
 
 from __future__ import annotations
-
-# asyncio lets us run multiple cases concurrently.
 import asyncio
-
-# Counter is used for confidence-mode vote counting.
 from collections import Counter
-
-# asynccontextmanager lets us create an optional semaphore wrapper.
 from contextlib import asynccontextmanager
-
-# Type hints for readability.
 from typing import Any, Callable, Dict, List, Tuple
-
-# Confidence settings should already exist in config.py.
 from Code.config import (
     CONFIDENCE_ATTEMPTS,
     CONFIDENCE_THRESHOLD_PERCENTAGE,
     ENABLE_CONFIDENCE_CHECKING,
 )
 
-# Import the DSPy label functions.
 from Code.dspy_programs import (
     StrokePrediction,
     initialize_dspy_programs,
@@ -63,9 +52,6 @@ from Code.dspy_programs import (
     label_combined,
 )
 
-# Keep your existing checker.
-# This is important because the DSPy method should be evaluated using the same
-# review logic as your manual prompt method.
 from Code.review_checks import add_review_flags
 
 

@@ -1,21 +1,3 @@
-"""
-config.py
-
-Copy these settings into your existing config.py.
-
-This file is intentionally separate because your current config.py probably
-already has many project-specific settings. The safest approach is to copy
-only the settings you need from here into your real config.py.
-"""
-
-# ---------------------------------------------------------------------------
-# Master toggle
-# ---------------------------------------------------------------------------
-# Set this to True when you want to use the DSPy pipeline.
-# Set it to False when you want to keep using your manual prompts.py pipeline.
-USE_DSPY = True
-
-
 # ---------------------------------------------------------------------------
 # DSPy model settings
 # ---------------------------------------------------------------------------
@@ -50,6 +32,11 @@ DSPY_MAX_TOKENS = 1200
 # The DSPy runner will look in this directory.
 DSPY_PROGRAM_DIR = "optimized_programs"
 
+# ---------------------------------------------------------------------------
+# File paths
+# ---------------------------------------------------------------------------
+GROUND_TRUTH_FILE = "Files/Ground_truths.xlsx"
+
 
 # ---------------------------------------------------------------------------
 # Confidence checking
@@ -63,15 +50,15 @@ DSPY_PROGRAM_DIR = "optimized_programs"
 #
 # When disabled:
 #   - Each report is labeled once.
+# Confidence settings used by labeler.py
 ENABLE_CONFIDENCE_CHECKING = False
-
-# Number of repeated attempts per report when confidence mode is enabled.
 CONFIDENCE_ATTEMPTS = 10
+CONFIDENCE_THRESHOLD_PERCENTAGE = 51.0
 
-# Minimum vote percentage needed to be considered confident.
-# Example:
-#   51.0 means a label set must win at least 51% of attempts.
-CONFIDENCE_THRESHOLD_PERCENTAGE = 67.0
+# Compatibility aliases used by confidence.py / review_checks.py
+CONFIDENCE_RUNS = CONFIDENCE_ATTEMPTS
+CONFIDENCE_TEMPERATURE = DSPY_TEMPERATURE
+MIN_CONFIDENCE_PERCENTAGE = CONFIDENCE_THRESHOLD_PERCENTAGE
 
 
 # ---------------------------------------------------------------------------

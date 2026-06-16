@@ -34,26 +34,12 @@ Then main_dspy.py will automatically try to load that saved program.
 """
 
 from __future__ import annotations
-
-# argparse handles command-line options.
 import argparse
-
-# random is used for deterministic train/dev/test splitting.
 import random
-
-# Path creates the optimized_programs folder if needed.
 from pathlib import Path
-
-# Type hints.
 from typing import Any, List, Set
-
-# DSPy is the optimization framework.
 import dspy
-
-# pandas reads ground truth spreadsheets.
 import pandas as pd
-
-# Program directory comes from config.py.
 from Code.config import DSPY_PROGRAM_DIR
 
 # Import base DSPy programs and model configuration.
@@ -104,12 +90,6 @@ def normalize_gt(value: Any) -> Set[str]:
 
 
 def normalize_pred(value: Any) -> Set[str]:
-    """
-    Normalize predicted labels from DSPy.
-
-    This uses your existing normalize_labels() helper.
-    """
-
     return set(normalize_labels(value))
 
 
