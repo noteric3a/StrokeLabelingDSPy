@@ -34,8 +34,8 @@ from typing import Any, Dict, List
 import pandas as pd
 
 # Import code.
-from Code.labeler import label_cases
-from Code.validate import check_answers
+from labeler import label_cases
+from validate import check_answers
 
 
 def _first_existing(row, candidates: List[str]) -> Any:
