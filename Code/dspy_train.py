@@ -1268,23 +1268,16 @@ def main():
     parser.add_argument("--ground-truth", default=cfg.GROUND_TRUTH_FILE, help="Path to ground-truth answer key Excel file.")
     parser.add_argument("--report-type", choices=["CT", "CTA", "CTP"], required=True, help="Which modality to optimize.")
     parser.add_argument("--max-cases", type=int, default=None, help="Optional number of cases for faster testing.")
-    parser.add_argument("--loop", action="store_true", help="Keep optimizing repeatedly until stopped with Ctrl+C.")
+    parser.add_argument("--loop", action="store_true", help="Keep optimizing repeatedly until stopped with Ctrl+C. Each accepted prompt is saved and warm-started by the next iteration.")
+    parser.add_argument("--fresh-start", action="store_true", help="Do not load an existing optimized program before optimizing. Use this only when you want to start over from config.py instructions.")
     parser.add_argument("--no-run-logs", action="store_true", help="Disable timestamped optimization folders.")
     parser.add_argument("--history-size", type=int, default=30, help="Number of visible DSPy history items to save per stage.")
     parser.add_argument("--baseline-only", action="store_true", help="Evaluate the baseline and save debug logs without running MIPRO.")
     parser.add_argument("--smoke-test", action="store_true", help="Run one test prediction and stop.")
     parser.add_argument("--allow-demos", action="store_true", help="Allow MIPRO to build demos. Default is OFF to avoid answer leakage.")
     parser.add_argument("--mipro-valset-source", choices=["train", "dev", "train_dev", "all"], default=getattr(cfg, "DSPY_MIPRO_VALSET_SOURCE", "train"), help="Which split MIPRO uses to evaluate candidate prompts. Default train makes MIPRO score all 28 train cases instead of only 6 dev cases.")
-    parser.add_argument("--accept-equal", action="store_true", help="Accept optimized prompt if test accuracy ties baseline and prompt quality check passes.")
-    parser.add_argument("--save-even-if-worse", action="store_true", help="Force-save candidate prompt if it passes prompt quality check, even if accuracy is worse. Not recommended.")
-    parser.add_argument(
-        "--loop-summary-file",
-        default=None,
-        help=(
-            "Optional path for the aggregate JSON written during --loop. "
-            "Default: Files/Results/DSPy_Optimization_Runs/<REPORT_TYPE>/loop_summary_<timestamp>.json"
-        ),
-    )
+    parser.add_argument("--accept-equal", action="store_true", help="Accept optimized prompt if the configured acceptance split ties baseline and prompt quality check passes.")
+    parser.add_argument("--save-even-if-worse", action="store_true", help="Deprecated safety valve: candidate_program.json is still logged, but worse candidates will not overwrite the active optimized program.")
     args = parser.parse_args()
 
     iteration = 1
