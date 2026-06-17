@@ -43,6 +43,18 @@ BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
 DSPY_SAVE_HISTORY_ON_ERROR = True
 DSPY_ERROR_HISTORY_SIZE = 3
 
+# DSPy optimizer behavior. Default is conservative for controlled experiments:
+# - no model-visible answer-key demos
+# - evaluate prompt candidates on the 28-case train split instead of only 6 dev cases
+# - do not overwrite the active prompt unless the optimized prompt is actually better
+DSPY_INSTRUCTION_ONLY_OPTIMIZATION = True
+DSPY_MAX_BOOTSTRAPPED_DEMOS = 0
+DSPY_MAX_LABELED_DEMOS = 0
+DSPY_MIPRO_VALSET_SOURCE = "train"  # choices used by dspy_train.py: train, dev, train_dev, all
+DSPY_SAVE_OPTIMIZED_ONLY_IF_BETTER = True
+DSPY_ACCEPT_EQUAL_ACCURACY = False
+DSPY_PROMPT_MIN_CHARS = 500
+
 # When enabled, main.py writes each run into a unique timestamped folder.
 # Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
 USE_TIMESTAMPED_RUN_FOLDERS = True
@@ -222,29 +234,30 @@ Output rules:
 """
 
 CTA_SIGNATURE_INSTRUCTIONS = f"""
-/no_think
-Do not think step by step. Return only the final answer fields.
-
 Your goal is to label acute stroke-related vascular territory from CTA report text.
 
 Allowed labels: {_ALLOWED_LABELS_TEXT}.
 
 CTA-specific rules:
+- Target only acute or newly/worsening large-vessel occlusion, named branch occlusion, or severe flow-limiting stenosis.
 - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
-- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
-  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
-- Use RCA/LCA only for common carotid or cervical carotid involvement.
-- Do not use RCA/LCA for carotid terminus.
+- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute territory is clearly stated.
+- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute territory is clearly stated.
+- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA maps to LACA.
+- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA maps to LPCA.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA, supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement. Do not use RCA/LCA for carotid terminus.
 - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
 - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
-- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
-  unless your project rules say they qualify.
+- Do not include NONE with any positive label. If the answer is NONE, output only NONE.
+- Never output every allowed label. Output only labels directly supported by the report.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, stable findings, congenital variants, or hypoplastic vessels.
 
 Output rules:
 - Do not explain step by step.
 - Do not write hidden analysis.
-- Reasoning must be exactly one short sentence.
 - Labels must be only comma-separated allowed labels.
+- Reasoning must be exactly one short sentence summarizing the key report finding.
 - End immediately after the labels.
 """
 
