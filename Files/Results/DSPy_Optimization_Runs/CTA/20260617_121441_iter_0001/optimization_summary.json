@@ -1,0 +1,16 @@
+{
+  "created_at": "2026-06-17T12:18:40",
+  "iteration": 1,
+  "report_type": "CTA",
+  "reports_file": "Files/Report/New Reports.xlsx",
+  "ground_truth_file": "Files/GT/GroundTruthKeyNew.xlsx",
+  "max_cases": null,
+  "total_examples": 40,
+  "train_examples": 28,
+  "dev_examples": 6,
+  "test_examples": 6,
+  "baseline_accuracy": 0.5,
+  "optimized_accuracy": 0.5,
+  "active_saved_program": "optimized_programs\\cta_labeler.json",
+  "timestamped_run_dir": "Files\\Results\\DSPy_Optimization_Runs\\CTA\\20260617_121441_iter_0001"
+}
