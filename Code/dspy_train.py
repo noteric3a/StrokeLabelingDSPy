@@ -377,7 +377,6 @@ def load_examples(
     print(f"Loaded {len(examples)} {report_type} examples")
     print(f"Skipped rows missing report text: {missing_report}")
     print(f"Skipped rows missing ground truth: {missing_gt}")
-    print("Gold labels are hidden from DSPy Example objects and used only by Python metrics.")
     if not examples:
         raise ValueError("No training examples were loaded. Check shared case IDs and column names.")
     return examples
