@@ -1,0 +1,282 @@
+[
+  {
+    "split": "train",
+    "case_id": "023980980_20250315_06184100",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: Acute infarct in the left parietal lobe, temporal lobe, and posterior "
+  },
+  {
+    "split": "train",
+    "case_id": "016558066_20210526_10195300",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  right sided weakness    COMPARISON:  None.    TECHNIQUE: Axial CT images of the head obtained without intravenous contrast. Multiplanar reformatted images were also generated.    FINDINGS:    Dense left M1 middle cerebral artery consistent with thrombus. Hypoattenuation consistent with recent ischemic injury involving the left insular cortex,  the adjacent left frontal operculum, and likely the left basal ganglia. Aspects score of 6-"
+  },
+  {
+    "split": "train",
+    "case_id": "025194804_20250505_15314300",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAM: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected TECHNIQUE: Noncontrast enhanced images of the brain were obtained from the skull base to the vertex. Both soft tissue and bone reconstruction algorithms were performed.   CT scans are performed using radiation dose reduction techniques (iterative reconstruction and/or automated exposure control). Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose manag"
+  },
+  {
+    "split": "train",
+    "case_id": "023295611_20211221_14525200",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  CT head 1/23/2021    TECHNIQUE: Axial CT images of the head obtained without intravenous contrast. Multiplanar reformatted images were also generated.    FINDINGS:    No evidence of acute intracranial hemorrhage, mass, mass effect, midline shift, or acute infarct.    Ventricles and sulci are normal in appearance for age.  Basal cisterns are clear. Calvarium is intact.    Orbits a"
+  },
+  {
+    "split": "train",
+    "case_id": "110795508_20240716_02562300",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "CT HEAD WITHOUT CONTRAST . CLINICAL HISTORY: Neuro deficit  acute  stroke suspected TECHNIQUE: Axial noncontrast CT images through the head were obtained. This exam was performed according to our departmental dose optimization program which includes automated exposure control, adjustment of the mA and/or kV according to patient size and/or use of iterative reconstruction technique.  Coronal and sagittal  reformats were provided.   COMPARISON: None available. FINDINGS: There is no hemorrhage, ext"
+  },
+  {
+    "split": "train",
+    "case_id": "110697720_20240303_06460500",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. FINDINGS:  There is no evidence of acute hemorrhage, mass lesion, or midline shift. The gray-white matter differentiation is preserved with no evidence of acute territorial infarction. Ventricles, sulci, and cisterns are age-appropriate in size and configuration.  There is no extra-axial fluid collection. Visualized paranasal sinuses and mastoid air cells are clear. Bones, orbit"
+  },
+  {
+    "split": "train",
+    "case_id": "023051824_20241130_13040900",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:   CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:   Neuro deficit  acute  stroke suspected COMPARISON:   CT head dated January 26, 2018 TECHNIQUE: Noncontrast enhanced images of the brain were obtained from the skull base to the vertex. Both soft tissue and bone reconstruction algorithms were performed.    CT scans are performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose managem"
+  },
+  {
+    "split": "train",
+    "case_id": "029003746_20220922_14520000",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    FINDINGS:  There is generalized brain parenchymal involution atrophy with white matter nonspecific hypodensities compatible with chronic white matter ischemic changes. There is minimal nonspecific ventriculomegaly most likely related to central volume loss.  There is no evidence of acute hemorrhage, mass lesion, or midline shift. The gray-white matter differentiation is "
+  },
+  {
+    "split": "train",
+    "case_id": "018146324_20221108_20503800",
+    "labels": "RMCA",
+    "reasoning": "Answer key label is RMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose.    Findings:    Cortical based hypodensity in the posterior right insula and adjacent right temporal lobe compatible with acute ischemia. There is hyperdensity in the right MCA compatible with subtotal occlusion seen on the CT angiogram "
+  },
+  {
+    "split": "train",
+    "case_id": "041172966_20240202_02254100",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    No evidence of acute intracranial hemorrhage, mass, mass e"
+  },
+  {
+    "split": "train",
+    "case_id": "110017328_20250719_09543300",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: March 4, 2025 CLINICAL HISTORY Neuro deficit  acute  stroke suspected.   TECHNIQUE: Non-contrast CT scan of the head with thin-section contiguous transaxial images from the skull base to the vertex.  CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achievi"
+  },
+  {
+    "split": "train",
+    "case_id": "110843924_20240916_23200800",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: No evidence of acute intracranial hemorrhage, mass, mass effect, midli"
+  },
+  {
+    "split": "train",
+    "case_id": "110655124_20240105_18302700",
+    "labels": "RMCA",
+    "reasoning": "Answer key label is RMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected Last known normal > 6 hours. COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image. FINDINGS: Skull/Scalp: No lytic or blastic lesions. No"
+  },
+  {
+    "split": "train",
+    "case_id": "109509469_20241016_14211000",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: January 3, 2024 CLINICAL HISTORY Neuro deficit  acute  stroke suspected.   TECHNIQUE: Non-contrast CT scan of the head with thin-section contiguous transaxial images from the skull base to the vertex.  CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achie"
+  },
+  {
+    "split": "train",
+    "case_id": "030953939_20230512_09252300",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. Findings: Cortical based hypodensity in the left insula and left frontal operculum. No intracranial hemorrhage, mass effect or hydrocephalus. ASPECT score of 8. Concurrent CT angiogram shows occlusion of the distal left M1 segment. Paranasal sin"
+  },
+  {
+    "split": "train",
+    "case_id": "101047983_20241218_19554800",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. All CT images were acquired using low-dose technique with automated exposure control.  IMPRESSION:  Large occlusive hypodense clot in the M1 and M2 segment of the left MCA with acute infarction in the left basal ganglia and left corona radiata with is elevation of the cortical gray matter and an ASPECT score of approximately 8. There is no acute hemorrhage or mass effect. There "
+  },
+  {
+    "split": "train",
+    "case_id": "103803581_20241130_20052800",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRI brain 11/29/2024 TECHNIQUE: Noncontrast enhanced images of the brain were obtained from the skull base to the vertex. Both soft tissue and bone reconstruction algorithms were performed. Coronal and sagittal reformatted images were generated. CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS: Evolvin"
+  },
+  {
+    "split": "train",
+    "case_id": "110806095_20240729_18595400",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: Interpretation is made within the confines of artifact which limits ev"
+  },
+  {
+    "split": "train",
+    "case_id": "031756273_20230516_12120100",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  stroke COMPARISON:  Head CT on 1/2/2023, brain MRI on 1/5/2023, and head CT, CTA, and CT perfusion on 5/16/2023. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: There is small "
+  },
+  {
+    "split": "train",
+    "case_id": "110120573_20220204_18010500",
+    "labels": "RMCA",
+    "reasoning": "Answer key label is RMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    There is evidence of acute right MCA territorial infarctio"
+  },
+  {
+    "split": "train",
+    "case_id": "109991449_20231231_08440600",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "Study: CT STROKE BRAIN WO CONTRAST 12/31/2023 8:29 AM  Ordering Physician: DIEU HUONG HO    Clinical Indication: AMS  R side weakness;  Comparison: None    TECHNIQUE: Noncontrast images of the brain are obtained from the skull base to the vertex. Axial, sagittal, and coronal images are interpreted. DLP: 1083 mGy-cm    This exam was performed according to our departmental dose-optimization protocol, which includes automated exposure control, adjustment of the mA and/or kV according to patient siz"
+  },
+  {
+    "split": "train",
+    "case_id": "109937236_20210812_23304300",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    No evidence of acute intracranial hemorrhage, mass, mass e"
+  },
+  {
+    "split": "train",
+    "case_id": "000935015_20220606_07274100",
+    "labels": "LPCA",
+    "reasoning": "Answer key label is LPCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   COMPARISON:  August 21, 2020.    CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMMENTS:  Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained.    CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose.        FINDINGS:  There is subtle cortical and subcortical low density at the left parietal lobe which is a pro"
+  },
+  {
+    "split": "train",
+    "case_id": "110893340_20241119_09580800",
+    "labels": "RMCA",
+    "reasoning": "Answer key label is RMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image. FINDINGS: Parenchyma: There is hypoattenuation of the brain parenchyma in the right"
+  },
+  {
+    "split": "train",
+    "case_id": "109694670_20210309_22443200",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY: STROKE    COMPARISON:  None    TECHNIQUE: Noncontrast CT of the brain was performed. Both soft tissue and bone reconstruction algorithms are interpreted.    CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose.    FINDINGS:    No acute cortical infarct is identified. No intracranial hemorrhage, extra-axial collection, mass effect or hyperdense vessel is seen. There"
+  },
+  {
+    "split": "train",
+    "case_id": "041244179_20230521_12422300",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  acute left sided weakness COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: Multiple right-sided border zone hypoattenuation is in the background of chronic la"
+  },
+  {
+    "split": "train",
+    "case_id": "007814569_20210706_13274400",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    Large acute/subacute MCA distribution infarct involving th"
+  },
+  {
+    "split": "train",
+    "case_id": "109380776_20240924_17553700",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: None CLINICAL HISTORY Neuro deficit  acute  stroke suspected.   TECHNIQUE: Non-contrast CT scan of the head with thin-section contiguous transaxial images from the skull base to the vertex.  CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a  hig"
+  },
+  {
+    "split": "dev",
+    "case_id": "010965184_20221208_09301000",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  CT head 7/18/2017    TECHNIQUE: Axial CT images of the head obtained without intravenous contrast. Multiplanar reformatted images were also generated.    FINDINGS:    No evidence of acute intracranial hemorrhage, mass, or acute infarct.    Ventricles and sulci are normal in appearance for age.  Scattered hypoattenuation within the cerebral white matter likely reflecting mild chro"
+  },
+  {
+    "split": "dev",
+    "case_id": "000365718_20220216_00165000",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  CT from October 18, 2020    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    No evidence of acute intracranial hemor"
+  },
+  {
+    "split": "dev",
+    "case_id": "013938063_20250729_08000900",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  MRI brain 7/28/2025. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: ASPECTS: -- Laterality: None. -- Caudate: 1/1. -- Lenti"
+  },
+  {
+    "split": "dev",
+    "case_id": "110826984_20240826_08171200",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: No acute intracranial hemorrhage, mass, mass effect, midline shift, or"
+  },
+  {
+    "split": "dev",
+    "case_id": "020034013_20230531_13443300",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE: Noncontrast CT of the brain was performed. Both soft tissue and bone reconstruction algorithms are interpreted. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: No acute cortical infarct is identified. No intracranial hemorrhage, extra-axial collection, or mass effect is seen. There is"
+  },
+  {
+    "split": "dev",
+    "case_id": "020174066_20210626_20311800",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:   CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:   Stroke.    COMPARISON:   NONE    TECHNIQUE: Noncontrast enhanced images of the brain were obtained from the skull base to the vertex. Both soft tissue and bone reconstruction algorithms were performed.  CT scans are performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation expos"
+  },
+  {
+    "split": "test",
+    "case_id": "023691702_20250813_16293200",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected Last known normal > 6 hours. COMPARISON:  Head CT from 11/21/2021. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image. FINDINGS: Skull/Scalp: No lytic or "
+  },
+  {
+    "split": "test",
+    "case_id": "034597583_20210124_14400000",
+    "labels": "NONE",
+    "reasoning": "Answer key label is NONE.",
+    "report_text_preview": "EXAMINATION:   CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:   Stroke. Follow-up.    COMPARISON:   Head CT scan dated January 24, 2021    TECHNIQUE: Noncontrast enhanced images of the brain were obtained from the skull base to the vertex. Both soft tissue and bone reconstruction algorithms were performed.  CT scans are performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management techn"
+  },
+  {
+    "split": "test",
+    "case_id": "037460599_20250831_06581000",
+    "labels": "LMCA",
+    "reasoning": "Answer key label is LMCA.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: August 24, 2025 CLINICAL HISTORY Neuro deficit  acute  stroke suspected, RUE weakness  speech changes.   TECHNIQUE: Non-contrast CT scan of the head with thin-section contiguous transaxial images from the skull base to the vertex.  CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust "
+  },
+  {
+    "split": "test",
+    "case_id": "108788833_20230828_06075500",
+    "labels": "LPCA",
+    "reasoning": "Answer key label is LPCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST COMPARISON:  None CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMMENTS:  Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS:  There is mild mucosal thickening in the visualized sinuses. There is calcific atherosclerotic change in the arteries at the"
+  },
+  {
+    "split": "test",
+    "case_id": "009444068_20210906_00284700",
+    "labels": "RMCA",
+    "reasoning": "Answer key label is RMCA.",
+    "report_text_preview": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.    FINDINGS:    Acute infarct involving right MCA territory involving righ"
+  },
+  {
+    "split": "test",
+    "case_id": "021962121_20241220_18250500",
+    "labels": "LACA, LMCA",
+    "reasoning": "Answer key label is LACA, LMCA.",
+    "report_text_preview": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE: Noncontrast CT of the brain was performed. Both soft tissue and bone reconstruction algorithms are interpreted. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is an acute infarct involving the entire left MCA and ACA territories (Aspects 0). There is mild local mass effect with"
+  }
+]

@@ -1,0 +1,6 @@
+Report type: CTA
+Created at: 2026-06-17T12:38:51
+Run folder: Files\Results\DSPy_Optimization_Runs\CTA\20260617_123709_iter_0001
+
+Baseline accuracy: 0.00% (0/6)
+Optimized accuracy: 50.00% (3/6)

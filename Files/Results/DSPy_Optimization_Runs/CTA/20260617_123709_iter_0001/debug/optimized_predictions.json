@@ -1,0 +1,100 @@
+[
+  {
+    "case_id": "023691702_20250813_16293200",
+    "gold_raw": "NONE",
+    "gold": [
+      "NONE"
+    ],
+    "report_text_preview": "EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  Head CT from 8/13/2025. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  Internal carotid arteries and proximal branches: Right: Mild to moderate stenoses at the siphon. Left: Mild to moderate stenoses at the siphon. Vertebral arteries: Mild to moderate stenoses on the right. Basilar artery: Patent. Posterior cerebral arteries: Severe focal stenosis at the left P2 PCA. Otherwise, mild sc",
+    "status": "ok",
+    "match": true,
+    "predicted": [
+      "NONE"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='NONE',\n    reasoning='Answer key label is NONE.'\n)>",
+    "raw_reasoning": "Answer key label is NONE.",
+    "raw_prediction_repr": "Prediction(\n    labels='NONE',\n    reasoning='Answer key label is NONE.'\n)"
+  },
+  {
+    "case_id": "034597583_20210124_14400000",
+    "gold_raw": "RMCA, RPCA",
+    "gold": [
+      "RMCA",
+      "RPCA"
+    ],
+    "report_text_preview": "EXAMINATION:  CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY:  STROKE    COMPARISON:  None.    TECHNIQUE: CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. Study was obtained during the arterial phase of enhancement.        IMPRESSION:  3-D reconstructions were processed off-line.    Severe narrowing of the left supraclinoid internal carotid artery.    Diffuse small caliber of the left MCA and its branches likely due to chronic decreased flow. Superimposed area of narrowing cannot be excluded.    Severe narrowing and possible short segment occlusion of the right M1 segment. There are multiple adjacent collaterals with reconstitution of the M2 segments, this is likely chronic in nature.    Mild narrowing of the right cavernous/clinoid internal carotid artery.    Severe narrowing and possible short segment occlusion of the right P2 segment. There are multiple adjacent collaterals with reconstitution of the mor",
+    "status": "ok",
+    "match": false,
+    "predicted": [
+      "RMCA"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)>",
+    "raw_reasoning": "Answer key label is RMCA.",
+    "raw_prediction_repr": "Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)"
+  },
+  {
+    "case_id": "037460599_20250831_06581000",
+    "gold_raw": "LMCA",
+    "gold": [
+      "LMCA"
+    ],
+    "report_text_preview": "EXAMINATION:  CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. FINDINGS: Axial images were obtained throughout the the brain after intravenous contrast infusion with MPR and 3-D MIP image reconstructions.   CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a  highly diagnostic quality image. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large vessel occlusion. Left M1 segment distal finger defects with high-grade stenosis suggestive of intra-arterial embolus or thrombus is new since August 24, 2025. There is some antegrade flow in some of the left MCA branches. There is a fairly large area of perfusion in the  left MCA territory. Th",
+    "status": "ok",
+    "match": false,
+    "predicted": [
+      "RMCA"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)>",
+    "raw_reasoning": "Answer key label is RMCA.",
+    "raw_prediction_repr": "Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)"
+  },
+  {
+    "case_id": "108788833_20230828_06075500",
+    "gold_raw": "NONE",
+    "gold": [
+      "NONE"
+    ],
+    "report_text_preview": "EXAMINATION:  CT ANGIOGRAM HEAD W WO CONTRAST COMPARISON:  None CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMMENTS:  Axial postcontrast CT scan slices of the head were obtained. Postprocessing for angiographic evaluation including 3-D reconstructions was obtained. The data was analyzed using artificial intelligence software to assist clinical diagnosis of  large vessel arterial occlusion. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS:  The AI software does not detect a large vessel arterial occlusion. There is dense calcific atherosclerotic change in the upper internal carotid arteries. The exact degree of stenosis is uncertain. No definite severe narrowing is identified. Tiny posterior communicating arteries are suspected bilaterally. There is mild narrowing in the upper right vertebral artery. The basilar artery shows no significant stenosis. The proximal cerebral arteries appear i",
+    "status": "ok",
+    "match": true,
+    "predicted": [
+      "NONE"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='NONE',\n    reasoning='Answer key label is NONE.'\n)>",
+    "raw_reasoning": "Answer key label is NONE.",
+    "raw_prediction_repr": "Prediction(\n    labels='NONE',\n    reasoning='Answer key label is NONE.'\n)"
+  },
+  {
+    "case_id": "009444068_20210906_00284700",
+    "gold_raw": "RMCA",
+    "gold": [
+      "RMCA"
+    ],
+    "report_text_preview": "EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Stroke  follow up    COMPARISON:  CT from the same date        TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Complete occlusion of right middle cerebral artery from its origin. Flow is significantly decreased in distal branches . Bilateral distal ICA, ACA and left MCA are patent.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Basilar artery and vertebral arteries are hypoplastic. Fetal origin of bilateral PCAs.    Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.    Limited examination of the brain demonstrates acute right MCA territo",
+    "status": "ok",
+    "match": true,
+    "predicted": [
+      "RMCA"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)>",
+    "raw_reasoning": "Answer key label is RMCA.",
+    "raw_prediction_repr": "Prediction(\n    labels='RMCA',\n    reasoning='Answer key label is RMCA.'\n)"
+  },
+  {
+    "case_id": "021962121_20241220_18250500",
+    "gold_raw": "LACA, LMCA",
+    "gold": [
+      "LACA",
+      "LMCA"
+    ],
+    "report_text_preview": "EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  Concurrent CT brain. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  Internal carotid arteries and proximal branches: Right: Patent. Left: Acute thrombus extending from the petrous/intracranial segment of the ICA to the ICA terminus. Occluded MCA. Occluded A1 segment of the ACA. Reconstitution of the A2 segment by the right ACA and anterior communicating artery. Vertebral arteries: Pate",
+    "status": "ok",
+    "match": false,
+    "predicted": [
+      "RMCA"
+    ],
+    "raw_labels": "<bound method Example.labels of Prediction(\n    labels='RMCA,RMCA,RMCA,RMCA,RMCA,RMCA,RMCA,RMCA',\n    reasoning='Answer key label is RMCA.'\n)>",
+    "raw_reasoning": "Answer key label is RMCA.",
+    "raw_prediction_repr": "Prediction(\n    labels='RMCA,RMCA,RMCA,RMCA,RMCA,RMCA,RMCA,RMCA',\n    reasoning='Answer key label is RMCA.'\n)"
+  }
+]

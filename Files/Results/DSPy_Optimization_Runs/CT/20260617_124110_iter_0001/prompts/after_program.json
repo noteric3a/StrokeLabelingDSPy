@@ -1,0 +1,57 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "report_text": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST   CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected    COMPARISON:  None.    TECHNIQUE: CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose.    Findings:    Cortical based hypodensity in the posterior right insula and adjacent right temporal lobe compatible with acute ischemia. There is hyperdensity in the right MCA compatible with subtotal occlusion seen on the CT angiogram of the distal right M1 segment.    No hemorrhage or mass effect.    Mild chronic ischemic small vessel white matter changes. Left globe prosthesis.    IMPRESSION:    Acute right MCA ischemic infarct.    Subtotal occlusion of the right MCA.    Findings were discussed with and acknowledged by Dr. Dragos at 11/8/2022 9:10 PM.    HMRM-WPHYRRS",
+        "labels": "RMCA",
+        "reasoning": "Acute right MCA ischemic infarct."
+      },
+      {
+        "case_id": "031756273_20230516_12120100",
+        "report_text": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  stroke COMPARISON:  Head CT on 1/2/2023, brain MRI on 1/5/2023, and head CT, CTA, and CT perfusion on 5/16/2023. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: There is small region of hypodensity of the left insular cortex (series 301, images 34-35) that appears new from 1/2023 but not significantly changed from the head CT earlier this morning, suspect small focus of acute-subacute ischemia in setting of  known near-occlusive distal left M1-proximal M2 MCA. Again noted is left frontal periventricular cavernous malformation. No evidence of intracranial hemorrhage, mass lesion, mass effect, or midline shift. Ventricles, sulci, and cisterns are stable in size and configuration with no hydrocephalus or extra-axial fluid collection. There is trace bilateral maxillary sinus mucosal thickening, suspect postoperative changes from functional endoscopic sinus surgery. There is scattered right mastoid effusion. IMPRESSION: Suspect small focus of acute-subacute ischemia of the left insular cortex (ASPECTS 9) in setting of known near-occlusive distal left M1-proximal M2 MCA. No evidence of hemorrhagic transformation. Left MCA territory hypoperfusion without evidence of infarction by perfusion criteria on concurrent CTP. Left frontal periventricular cavernous malformation. RECOMMENDATION: Brain MRI for further evaluation. Findings were discussed with Nurse Machelle Davis on 5/16/2023 1:02 PM, and she verbalized understanding of the report. 1WT1RAD_PS02",
+        "labels": "LMCA",
+        "reasoning": "Answer key label is LMCA."
+      },
+      {
+        "case_id": "110843924_20240916_23200800",
+        "report_text": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure.  Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image.   FINDINGS: No evidence of acute intracranial hemorrhage, mass, mass effect, midline shift, or acute infarct.  Small chronic infarct right cerebellum. Mild chronic microvascular ischemic change. Ventricles and sulci are normal in appearance for patient's age.  Basal cisterns are clear. Intracranial vascular calcifications are present. Calvarium is intact. Bilateral lens extractions. Mucosal thickening right maxillary sinus. The remainder of the paranasal sinuses are clear. Sebaceous cyst in the left parietal scalp measuring 1.8 cm.    IMPRESSION:  1. No CT evidence of acute intracranial abnormality. Findings were discussed with and acknowledged by JULIE EVANS SCHAFERLING at 9/16/2024 11:30 PM who verbalized understanding.  1RM1RAD_PS39",
+        "labels": "NONE",
+        "reasoning": "Answer key label is NONE."
+      },
+      {
+        "case_id": "110893340_20241119_09580800",
+        "report_text": "EXAMINATION:  CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques.  Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure  while achieving a diagnostic quality image. FINDINGS: Parenchyma: There is hypoattenuation of the brain parenchyma in the right insular lobe and possibly right inferior frontal gyrus with obscuration of the gray-white matter interface. Hypodense foci are visualized in the periventricular and subcortical  white matter, nonspecific, may be sequela of chronic small vessel ischemic disease. There is no evidence of acute hemorrhage. Skull/Scalp: No lytic or blastic lesions. No acute fractures. Extra-axial spaces: No abnormal density. No extra-axial fluid collections. Brain volume: Appropriate for age. Ventricles: No hydrocephalus. Vessels: There is hyperdensity seen in the right middle cerebral artery M2 segment inferior division in the sylvian fissure. No abnormal density of the dural sinuses. Foramen magnum: No mass, Chiari malformation, or basilar invagination. Sella: Unremarkable. Orbits: Unremarkable. Paranasal sinuses/mastoid air cells: Clear.  IMPRESSION:  Right hyperdense middle cerebral artery M2 segment inferior division, concerning for occlusion. Acute infarct in the right insula. No evidence of acute hemorrhage. Dr Abou Karam discussed the important findings with Dr WERNER at 11/19/2024 9:45 AM 5MN1IMG_PS13",
+        "labels": "RMCA",
+        "reasoning": "Answer key label is RMCA."
+      }
+    ],
+    "signature": {
+      "instructions": "Prompt a Language Model to identify the specific acute ischemic stroke territory from CT brain report text only by analyzing the patient's clinical history, examination findings, and CT scan images without mentioning specific arterial territories or anatomical details.",
+      "fields": [
+        {
+          "prefix": "Report Text:",
+          "description": "CT brain report text."
+        },
+        {
+          "prefix": "Labels:",
+          "description": "Only comma-separated labels from the allowed list. Example: RMCA or NONE."
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "Exactly one short sentence. No step-by-step reasoning."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

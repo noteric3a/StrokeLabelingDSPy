@@ -1,0 +1,1 @@
+Prompt a Language Model to identify the specific acute ischemic stroke territory from CT brain report text only by analyzing the patient's clinical history, examination findings, and CT scan images without mentioning specific arterial territories or anatomical details.
