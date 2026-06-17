@@ -1,6 +1,0 @@
-Report type: CT
-Created at: 2026-06-17T12:42:41
-Run folder: Files\Results\DSPy_Optimization_Runs\CT\20260617_124110_iter_0001
-
-Baseline accuracy: 0.00% (0/6)
-Optimized accuracy: 33.33% (2/6)
