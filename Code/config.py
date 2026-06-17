@@ -28,6 +28,10 @@ DSPY_TEMPERATURE = 0.2
 DSPY_MAX_TOKENS = 1200
 DSPY_PROGRAM_DIR = "optimized_programs"
 
+# Disable DSPy/LM response caches during optimization/evaluation so every
+# training run reflects fresh model calls rather than reused completions.
+DSPY_DISABLE_CACHE = True
+
 # Compatibility values for ollama_client.py for testing purposes
 MODEL_NAME = DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
 OLLAMA_URL = "http://localhost:11434/api/generate"

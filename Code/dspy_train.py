@@ -40,6 +40,32 @@ from utils import normalize_labels
 logging.getLogger("dspy.predict.predict").setLevel(logging.ERROR)
 
 
+def disable_training_caches() -> None:
+    """Ensure DSPy training/evaluation does not reuse cached LM completions.
+
+    The project ProcessingCache in cache.py is for main labeling runs and is not
+    imported here.  This function only handles DSPy's optional LM cache layer.
+    """
+    configure_cache = getattr(dspy, "configure_cache", None)
+    if callable(configure_cache):
+        try:
+            configure_cache(enable_memory_cache=False, enable_disk_cache=False)
+        except TypeError:
+            try:
+                configure_cache(enable_disk_cache=False, enable_memory_cache=False)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    try:
+        dspy.settings.configure(cache=False)
+    except Exception:
+        pass
+
+
+
+
 # =============================================================================
 # Python-only answer-key store
 # =============================================================================
@@ -669,144 +695,6 @@ def save_accuracy_report(path: Path, summary: Dict[str, Any]) -> None:
 
 
 # =============================================================================
-# Aggregate --loop JSON helpers
-# =============================================================================
-
-
-def make_loop_summary_path(report_type: str, explicit_path: Optional[str] = None) -> Path:
-    """Return the aggregate JSON path for one --loop run."""
-    if explicit_path:
-        path = Path(explicit_path)
-    else:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = (
-            Path("Files")
-            / "Results"
-            / "DSPy_Optimization_Runs"
-            / report_type.upper()
-            / f"loop_summary_{stamp}.json"
-        )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _summary_accuracy_item(summary: Dict[str, Any], stage: str, split: str = "test") -> Dict[str, Any]:
-    """Return a compact accuracy record for one stage/split."""
-    item = summary.get("accuracies", {}).get(stage, {}).get(split, {}) or {}
-    return {
-        "accuracy": item.get("accuracy"),
-        "correct": item.get("correct"),
-        "total": item.get("total"),
-        "wrong": item.get("wrong"),
-        "errors": item.get("errors"),
-    }
-
-
-def _loop_delta(before: Dict[str, Any], after: Dict[str, Any]) -> Optional[float]:
-    try:
-        if before.get("accuracy") is None or after.get("accuracy") is None:
-            return None
-        return float(after["accuracy"]) - float(before["accuracy"])
-    except Exception:
-        return None
-
-
-def loop_iteration_record(summary: Dict[str, Any]) -> Dict[str, Any]:
-    """Create one row for the aggregate --loop JSON.
-
-    The user-facing headline fields are:
-    - before_accuracy: baseline held-out test accuracy before MIPRO
-    - candidate_new_prompt_accuracy: held-out test accuracy for the prompt MIPRO proposed
-    - after_accuracy: held-out test accuracy for the prompt actually kept after guardrails
-    - new_prompt: the prompt MIPRO proposed
-    """
-    before = _summary_accuracy_item(summary, "baseline", "test")
-    candidate = _summary_accuracy_item(summary, "candidate", "test")
-    after = _summary_accuracy_item(summary, "active_after", "test")
-    prompt_text = summary.get("prompt_text", {}) or {}
-
-    return {
-        "iteration": summary.get("iteration"),
-        "created_at": summary.get("created_at"),
-        "run_folder": summary.get("timestamped_run_dir"),
-        "report_type": summary.get("report_type"),
-        "candidate_accepted": summary.get("candidate_accepted"),
-        "acceptance_reason": summary.get("acceptance_reason"),
-        "prompt_quality_reason": summary.get("prompt_quality_reason"),
-        "before_accuracy": before,
-        "candidate_new_prompt_accuracy": candidate,
-        "after_accuracy": after,
-        "after_minus_before_accuracy": _loop_delta(before, after),
-        "candidate_minus_before_accuracy": _loop_delta(before, candidate),
-        "all_split_accuracies": summary.get("accuracies", {}),
-        "before_prompt": prompt_text.get("before_prompt", ""),
-        "new_prompt": prompt_text.get("candidate_prompt", ""),
-        "after_prompt": prompt_text.get("after_prompt", ""),
-        "prompt_files": summary.get("prompt_files", {}),
-        "active_saved_program": summary.get("active_saved_program"),
-    }
-
-
-def update_loop_summary_json(path: Path, *, summary: Dict[str, Any], args: argparse.Namespace) -> None:
-    """Append one iteration to a loop-level JSON file.
-
-    This is written after every completed iteration, so an overnight run still
-    leaves useful data when stopped manually.
-    """
-    record = loop_iteration_record(summary)
-    if path.exists():
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            payload = {}
-    else:
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
-
-    payload.setdefault("created_at", datetime.now().isoformat(timespec="seconds"))
-    payload["updated_at"] = datetime.now().isoformat(timespec="seconds")
-    payload["report_type"] = args.report_type.upper()
-    payload["description"] = (
-        "Aggregate DSPy --loop report. before_accuracy is the baseline test accuracy, "
-        "candidate_new_prompt_accuracy is the test accuracy of the prompt proposed by DSPy, "
-        "and after_accuracy is the accuracy of the prompt actually kept after guardrails."
-    )
-    payload["settings"] = {
-        "reports_file": args.reports_file,
-        "ground_truth": args.ground_truth,
-        "max_cases": args.max_cases,
-        "mipro_valset_source": args.mipro_valset_source,
-        "history_size": args.history_size,
-        "allow_demos": args.allow_demos,
-        "accept_equal": args.accept_equal,
-        "save_even_if_worse": args.save_even_if_worse,
-    }
-    payload.setdefault("iterations", [])
-    payload["iterations"].append(record)
-    payload["iterations_completed"] = len(payload["iterations"])
-    payload["latest"] = record
-
-    def _acc(rec: Dict[str, Any], key: str) -> float:
-        try:
-            value = (rec.get(key) or {}).get("accuracy")
-            return float(value) if value is not None else float("-inf")
-        except Exception:
-            return float("-inf")
-
-    if payload["iterations"]:
-        payload["best_after_iteration"] = max(payload["iterations"], key=lambda r: _acc(r, "after_accuracy"))
-        payload["best_candidate_iteration"] = max(payload["iterations"], key=lambda r: _acc(r, "candidate_new_prompt_accuracy"))
-        payload["accepted_iterations"] = [
-            rec.get("iteration") for rec in payload["iterations"] if rec.get("candidate_accepted")
-        ]
-
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-    tmp.replace(path)
-
-
-# =============================================================================
 # Training one modality
 # =============================================================================
 
@@ -838,7 +726,9 @@ def train_one(
     save_even_if_worse: bool = False,
 ) -> Dict[str, Any]:
     report_type = report_type.upper()
+    disable_training_caches()
     configure_dspy()
+    disable_training_caches()
 
     run_dir: Optional[Path] = None
     layout: Optional[Dict[str, Path]] = None
@@ -898,6 +788,7 @@ def train_one(
         "dev_examples": len(devset),
         "test_examples": len(testset),
         "gold_labels_hidden_from_dspy_examples": True,
+        "dspy_cache_disabled": True,
         "instruction_only_optimization": not allow_demos,
         "max_bootstrapped_demos": 0 if not allow_demos else None,
         "max_labeled_demos": 0 if not allow_demos else None,
@@ -913,11 +804,6 @@ def train_one(
             "prompt_quality_reason": "not run",
             "accuracies": {"baseline": {k: summarize_eval(v) for k, v in baseline_results.items()}},
             "active_saved_program": None,
-            "prompt_text": {
-                "before_prompt": _signature_instructions(report_type),
-                "candidate_prompt": "",
-                "after_prompt": _signature_instructions(report_type),
-            },
         }
         if layout:
             save_predictions_debug(layout["debug"] / "predictions.json", {"baseline": baseline_results})
@@ -990,7 +876,6 @@ def train_one(
 
     active_program = optimized_program if accepted else program
     active_results = candidate_results if accepted else baseline_results
-    after_prompt = candidate_prompt if accepted else before_prompt
 
     Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
     active_save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
@@ -1013,18 +898,6 @@ def train_one(
         "baseline_accuracy": baseline_results["test"].accuracy,
         "candidate_accuracy": candidate_results["test"].accuracy,
         "optimized_accuracy": active_results["test"].accuracy,
-        "before_accuracy": baseline_results["test"].accuracy,
-        "after_accuracy": active_results["test"].accuracy,
-        "test_accuracy_delta": active_results["test"].accuracy - baseline_results["test"].accuracy,
-        # Text used by aggregate --loop JSON. The candidate prompt is the new
-        # prompt DSPy proposed; after_prompt is the prompt actually kept after
-        # the acceptance/quality guard.
-        "prompt_text": {
-            "before_prompt": before_prompt,
-            "candidate_prompt": candidate_prompt,
-            "after_prompt": after_prompt,
-            "new_prompt": after_prompt,
-        },
     }
 
     if layout:
@@ -1041,7 +914,7 @@ def train_one(
         })
         (layout["prompts"] / "candidate_prompt.txt").write_text(candidate_prompt, encoding="utf-8")
         save_program(optimized_program, layout["prompts"] / "candidate_program.json")
-        (layout["prompts"] / "after_prompt.txt").write_text(after_prompt, encoding="utf-8")
+        (layout["prompts"] / "after_prompt.txt").write_text(candidate_prompt if accepted else before_prompt, encoding="utf-8")
         save_program(active_program, layout["prompts"] / "after_program.json")
         (layout["root"] / "optimization_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         save_accuracy_report(layout["root"] / "accuracy_report.txt", summary)
@@ -1075,25 +948,12 @@ def main():
     parser.add_argument("--mipro-valset-source", choices=["train", "dev", "train_dev", "all"], default=getattr(cfg, "DSPY_MIPRO_VALSET_SOURCE", "train"), help="Which split MIPRO uses to evaluate candidate prompts. Default train makes MIPRO score all 28 train cases instead of only 6 dev cases.")
     parser.add_argument("--accept-equal", action="store_true", help="Accept optimized prompt if test accuracy ties baseline and prompt quality check passes.")
     parser.add_argument("--save-even-if-worse", action="store_true", help="Force-save candidate prompt if it passes prompt quality check, even if accuracy is worse. Not recommended.")
-    parser.add_argument(
-        "--loop-summary-file",
-        default=None,
-        help=(
-            "Optional path for the aggregate JSON written during --loop. "
-            "Default: Files/Results/DSPy_Optimization_Runs/<REPORT_TYPE>/loop_summary_<timestamp>.json"
-        ),
-    )
     args = parser.parse_args()
 
     iteration = 1
-    loop_summary_path: Optional[Path] = None
-    if args.loop:
-        loop_summary_path = make_loop_summary_path(args.report_type, args.loop_summary_file)
-        print(f"Loop summary JSON will be updated after every completed iteration: {loop_summary_path}")
-
     try:
         while True:
-            summary = train_one(
+            train_one(
                 report_type=args.report_type,
                 reports_file=args.reports_file,
                 ground_truth_file=args.ground_truth,
@@ -1108,16 +968,11 @@ def main():
                 accept_equal=args.accept_equal,
                 save_even_if_worse=args.save_even_if_worse,
             )
-            if loop_summary_path is not None:
-                update_loop_summary_json(loop_summary_path, summary=summary, args=args)
-                print(f"Updated loop summary JSON: {loop_summary_path}")
             if not args.loop:
                 break
             iteration += 1
     except KeyboardInterrupt:
         print("\nStopped DSPy optimization loop.")
-        if loop_summary_path is not None:
-            print(f"Loop summary JSON saved at: {loop_summary_path}")
 
 
 if __name__ == "__main__":

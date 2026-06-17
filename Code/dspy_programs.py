@@ -19,16 +19,62 @@ class StrokePrediction:
     reasoning: str
 
 
+def _disable_dspy_cache_if_configured() -> None:
+    """Best-effort cache disable for reproducible training/evaluation runs.
+
+    Your project-level ProcessingCache is not used by dspy_train.py, but DSPy
+    itself can cache LM calls depending on version/settings.  This helper turns
+    off DSPy's memory/disk caches when config.DSPY_DISABLE_CACHE is true.  It is
+    intentionally defensive so the code still runs across DSPy versions.
+    """
+    if not bool(getattr(cfg, "DSPY_DISABLE_CACHE", True)):
+        return
+
+    configure_cache = getattr(dspy, "configure_cache", None)
+    if callable(configure_cache):
+        for kwargs in (
+            {"enable_memory_cache": False, "enable_disk_cache": False},
+            {"enable_disk_cache": False, "enable_memory_cache": False},
+        ):
+            try:
+                configure_cache(**kwargs)
+                return
+            except TypeError:
+                continue
+            except Exception:
+                return
+
+    # Older/newer DSPy versions may expose settings differently.  Try silently.
+    try:
+        dspy.settings.configure(cache=False)
+    except Exception:
+        pass
+
+
 def configure_dspy() -> None:
     """Configure DSPy to use the model settings from config.py."""
-    lm = dspy.LM(
-        cfg.DSPY_MODEL,
+    _disable_dspy_cache_if_configured()
+
+    lm_kwargs = dict(
         api_base=cfg.DSPY_API_BASE,
         temperature=cfg.DSPY_TEMPERATURE,
         max_tokens=cfg.DSPY_MAX_TOKENS,
-        think=False,  # We handle CoT manually in the Combined program, so disable automatic thinking in DSPy.
+        think=False,  # Disable automatic thinking in DSPy/Ollama calls.
     )
+
+    # Some DSPy versions accept cache=False on LM; others do not.  Try it,
+    # then fall back without the argument if that version rejects it.
+    if bool(getattr(cfg, "DSPY_DISABLE_CACHE", True)):
+        lm_kwargs["cache"] = False
+
+    try:
+        lm = dspy.LM(cfg.DSPY_MODEL, **lm_kwargs)
+    except TypeError:
+        lm_kwargs.pop("cache", None)
+        lm = dspy.LM(cfg.DSPY_MODEL, **lm_kwargs)
+
     dspy.configure(lm=lm)
+    _disable_dspy_cache_if_configured()
 
 
 def clean_labels(raw_labels: Any) -> List[str]:
