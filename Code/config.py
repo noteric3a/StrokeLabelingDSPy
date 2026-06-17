@@ -20,7 +20,7 @@ from __future__ import annotations
 # DSPy / Ollama model settings
 # =============================================================================
 
-DSPY_MODEL = "ollama_chat/llama3.2:latest"
+DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
 # Keep DSPy model outputs short enough to be parseable.

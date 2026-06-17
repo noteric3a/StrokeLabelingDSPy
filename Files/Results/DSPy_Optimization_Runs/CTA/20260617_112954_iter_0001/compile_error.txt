@@ -1,1 +1,0 @@
-ImportError: MIPROv2 requires optional dependency 'optuna'. Install it with `pip install dspy[optuna]`.
