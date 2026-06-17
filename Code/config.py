@@ -222,6 +222,9 @@ Output rules:
 """
 
 CTA_SIGNATURE_INSTRUCTIONS = f"""
+/no_think
+Do not think step by step. Return only the final answer fields.
+
 Your goal is to label acute stroke-related vascular territory from CTA report text.
 
 Allowed labels: {_ALLOWED_LABELS_TEXT}.
