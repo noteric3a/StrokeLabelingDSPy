@@ -1,1 +1,0 @@
-To label acute stroke-related vascular territory from CTA report text, use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis, and specify downstream territories, such as RMCA/LMCA/RACA/LACA/RPCA/LPCA, RICA/LICA, BA, RVA, LVA, RICA, LICA.

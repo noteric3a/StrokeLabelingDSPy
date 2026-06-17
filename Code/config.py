@@ -55,9 +55,40 @@ DSPY_INSTRUCTION_ONLY_OPTIMIZATION = True
 DSPY_MAX_BOOTSTRAPPED_DEMOS = 0
 DSPY_MAX_LABELED_DEMOS = 0
 DSPY_MIPRO_VALSET_SOURCE = "train"  # choices used by dspy_train.py: train, dev, train_dev, all
+# Kept for compatibility with older scripts. The patched dspy_train.py always
+# protects the active optimized program from worse candidates.
 DSPY_SAVE_OPTIMIZED_ONLY_IF_BETTER = True
 DSPY_ACCEPT_EQUAL_ACCURACY = False
 DSPY_PROMPT_MIN_CHARS = 500
+
+# Prompt optimization acceptance/settings. MIPRO rewrites signature instructions;
+# for CTA, the core rule text is passed as a fixed input so optimization cannot
+# erase required vessel/label rules.
+DSPY_ACCEPTANCE_SPLIT = "dev"  # reserve test for final audit
+DSPY_OPTIMIZER_METRIC = "strict_exact"  # choices: exact, strict_exact, label_f1
+# Candidate prompts must beat the current saved/baseline program by more than this
+# average optimizer-score delta before they replace the optimized program.
+DSPY_MIN_SCORE_IMPROVEMENT = 0.0
+DSPY_MIPRO_AUTO = "light"
+DSPY_MIPRO_INIT_TEMPERATURE = 0.7
+DSPY_MIPRO_VERBOSE = True
+DSPY_MIPRO_PROGRAM_AWARE_PROPOSER = True
+DSPY_MIPRO_DATA_AWARE_PROPOSER = True
+DSPY_MIPRO_TIP_AWARE_PROPOSER = False
+DSPY_MIPRO_FEWSHOT_AWARE_PROPOSER = False
+DSPY_MIPRO_VIEW_DATA_BATCH_SIZE = 20
+
+# Optional: use a stronger prompt-proposal model while keeping DSPY_MODEL as
+# the task model. Leave as None to reuse DSPY_MODEL.
+DSPY_PROMPT_MODEL = None
+DSPY_PROMPT_MODEL_API_BASE = DSPY_API_BASE
+DSPY_PROMPT_MODEL_MAX_TOKENS = 4000
+
+DSPY_CTA_REQUIRED_PROMPT_TERMS = [
+    "Allowed labels", "NONE", "RMCA", "LMCA", "RICA", "LICA",
+    "Never output every", "Do not include NONE", "mild stenosis",
+    "chronic", "hypoplastic",
+]
 
 # When enabled, main.py writes each run into a unique timestamped folder.
 # Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
@@ -237,10 +268,10 @@ Output rules:
 - End immediately after the labels.
 """
 
-CTA_SIGNATURE_INSTRUCTIONS = f"""
+CTA_FIXED_RULES = f"""
 Your goal is to label acute stroke-related vascular territory from CTA report text.
 
-Allowed labels: {_ALLOWED_LABELS_TEXT}.
+Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
 
 CTA-specific rules:
 - Target only acute or newly/worsening large-vessel occlusion, named branch occlusion, or severe flow-limiting stenosis.
@@ -263,6 +294,20 @@ Output rules:
 - Labels must be only comma-separated allowed labels.
 - Reasoning must be exactly one short sentence summarizing the key report finding.
 - End immediately after the labels.
+"""
+
+CTA_SIGNATURE_INSTRUCTIONS = """
+Label CTA reports by applying the fixed `cta_rules` input to the `report_text`.
+The `cta_rules` input is authoritative and non-negotiable: do not summarize it,
+ignore it, or replace it with a shorter version. Optimized DSPy instructions may
+clarify how to apply those rules, but they must not weaken the allowed-label,
+NONE, vessel-mapping, chronic/stable, or output-format constraints.
+"""
+
+CTA_EFFECTIVE_PROMPT_PREVIEW = f"""{CTA_SIGNATURE_INSTRUCTIONS.strip()}
+
+Fixed CTA rules supplied as the `cta_rules` input:
+{CTA_FIXED_RULES.strip()}
 """
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""
@@ -302,7 +347,7 @@ Combined-specific rules:
 
 DSPY_PROGRAM_NAMES = {
     "CT": "ct_labeler",
-    "CTA": "cta_labeler",
+    "CTA": "cta_labeler_fixed_rules",
     "CTP": "ctp_labeler",
     "Combined": "combined_labeler",
 }
@@ -322,7 +367,7 @@ INCLUDE_CURRENT_PROMPT_COLUMNS = True
 # becomes too large.
 CURRENT_PROMPT_COLUMNS = {
     "CT Current Prompt": CT_SIGNATURE_INSTRUCTIONS,
-    "CTA Current Prompt": CTA_SIGNATURE_INSTRUCTIONS,
+    "CTA Current Prompt": CTA_EFFECTIVE_PROMPT_PREVIEW,
     "CTP Current Prompt": CTP_SIGNATURE_INSTRUCTIONS,
     "Combined Current Prompt": COMBINED_SIGNATURE_INSTRUCTIONS,
 }

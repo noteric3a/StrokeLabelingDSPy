@@ -92,10 +92,26 @@ def clean_labels(raw_labels: Any) -> List[str]:
     return cleaned
 
 
+def _prediction_field(pred: Any, field: str, default: Any = "") -> Any:
+    """Read a DSPy Prediction field without returning a bound method."""
+    for reader in (
+        lambda obj: obj[field],
+        lambda obj: obj.get(field),
+        lambda obj: getattr(obj, field),
+    ):
+        try:
+            value = reader(pred)
+        except Exception:
+            continue
+        if not callable(value):
+            return value
+    return default
+
+
 def prediction_to_result(pred: Any) -> StrokePrediction:
     """Convert a raw DSPy Prediction into the clean project output shape."""
-    labels = clean_labels(getattr(pred, "labels", "NONE"))
-    reasoning = str(getattr(pred, "reasoning", "") or "").strip()
+    labels = clean_labels(_prediction_field(pred, "labels", "NONE"))
+    reasoning = str(_prediction_field(pred, "reasoning", "") or "").strip()
     if not reasoning:
         reasoning = "No reasoning returned by DSPy program."
     return StrokePrediction(labels=labels, reasoning=reasoning)
@@ -189,7 +205,10 @@ def _direct_ollama_fallback(report_text: str, modality: str) -> StrokePrediction
 
         instruction_map = {
             "CT": cfg.CT_SIGNATURE_INSTRUCTIONS,
-            "CTA": cfg.CTA_SIGNATURE_INSTRUCTIONS,
+            # CTA uses a short optimizable signature plus fixed rules supplied
+            # through the cta_rules input. The direct fallback has no signature
+            # input channel, so include the same effective prompt text here.
+            "CTA": getattr(cfg, "CTA_EFFECTIVE_PROMPT_PREVIEW", cfg.CTA_SIGNATURE_INSTRUCTIONS),
             "CTP": cfg.CTP_SIGNATURE_INSTRUCTIONS,
         }
 
@@ -350,6 +369,12 @@ class CTStrokeSignature(dspy.Signature):
 
 
 class CTAStrokeSignature(dspy.Signature):
+    cta_rules: str = dspy.InputField(
+        desc=(
+            "Fixed CTA labeling rules supplied by code, not by the optimizer. "
+            "These rules are authoritative and must be applied to report_text."
+        )
+    )
     report_text: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["cta_report"])
     labels: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["labels"])
     reasoning: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["reasoning"])
@@ -399,7 +424,10 @@ class CTALabeler(dspy.Module):
         self.predict = dspy.Predict(CTAStrokeSignature)
 
     def forward(self, report_text: str):
-        return self.predict(report_text=report_text)
+        # Keep the CTA rule text outside the optimizable signature instruction.
+        # MIPRO can rewrite CTAStrokeSignature.__doc__, but it cannot delete this
+        # fixed input, so candidate prompts cannot collapse into a short summary.
+        return self.predict(cta_rules=cfg.CTA_FIXED_RULES, report_text=report_text)
 
 class CTPLabeler(dspy.Module):
     def __init__(self):
