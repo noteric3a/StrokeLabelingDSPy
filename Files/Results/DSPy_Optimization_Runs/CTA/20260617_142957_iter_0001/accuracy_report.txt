@@ -1,0 +1,25 @@
+Report type: CTA
+Created at: 2026-06-17T14:31:18
+Run folder: Files\Results\DSPy_Optimization_Runs\CTA\20260617_142957_iter_0001
+
+Accuracy by split:
+baseline train: 17.86% (5/28)
+baseline dev: 16.67% (1/6)
+baseline test: 0.00% (0/6)
+candidate train: 25.00% (7/28)
+candidate dev: 16.67% (1/6)
+candidate test: 16.67% (1/6)
+active_after train: 17.86% (5/28)
+active_after dev: 16.67% (1/6)
+active_after test: 0.00% (0/6)
+
+Candidate accepted as after prompt: False
+Acceptance reason: candidate rejected: prompt too short (105 chars < 500)
+Prompt quality check: prompt too short (105 chars < 500)
+
+Gold labels hidden from DSPy examples: True
+Instruction-only optimization: True
+MIPRO optimizer valset source: train
+MIPRO optimizer valset size: 28
+Max bootstrapped demos: 0
+Max labeled demos: 0

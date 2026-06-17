@@ -1,0 +1,32 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "To label acute stroke-related vascular territory from CTA report text, use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis, and specify downstream territories, such as RMCA/LMCA/RACA/LACA/RPCA/LPCA, RICA/LICA, BA, RVA, LVA, RICA, LICA.",
+      "fields": [
+        {
+          "prefix": "Report Text:",
+          "description": "CTA report text."
+        },
+        {
+          "prefix": "Labels:",
+          "description": "Only comma-separated labels from the allowed list. Example: RMCA or NONE."
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "Exactly one short sentence. No step-by-step reasoning."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}
