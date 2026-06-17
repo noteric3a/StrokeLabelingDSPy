@@ -1,0 +1,102 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "case_id": "110120573_20220204_18010500",
+        "modality": "CTA",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAM: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.    CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a  diagnostic quality image.    COMPARISON:  CT stroke, performed concurrently      FINDINGS:    Scattered calcifications are identified within the bilateral cavernous to supraclinoid ICAs and left V4 with minimal luminal irregularity. Minimal flow is seen within the left V4 vertebral artery after the left PICA takeoff.    There is moderate luminal narrowing along a distal right posterior M2/M3 MCA branch, which may or may not account for the suspected recent right frontal convexity ischemia identified on CT brain performed concurrently.    Otherwise no hemodynamically significant stenosis is identified of the intracranial internal carotid arteries, middle cerebral arteries, anterior cerebral arteries, intracranial vertebral arteries, basilar artery or posterior cerebral arteries.    There is no aneurysmal dilatation or vascular malformation of the circle of Willis.    The major dural sinuses are opacified normally.      IMPRESSION:    1.Moderate luminal narrowing along a distal right posterior M2/M3 MCA branch, which may or may not account for the suspected recent right frontal convexity ischemia identified on CT brain performed concurrently.  2.Otherwise no acute, hemodynamically significant narrowing of the circle of Willis vessels.  3.Chronic findings as detailed above.    Findings were discussed with Dr. MIKAEL LEE LUCAS at 2/4/2022 6:09 PM who verbalized understanding.    1RM1RAD_PS17",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "NONE"
+        ]
+      },
+      {
+        "case_id": "000935015_20220606_07274100",
+        "modality": "CTA",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  None    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.      FINDINGS:    The cervical, petrous, cavernous, clinoid and supraclinoid segments of internal carotid arteries are patent bilaterally. Small vascular calcifications along the supraclinoid segments are noted, however no aneurysms, dissection flaps or measurable  stenosis identified.    The major branches of the anterior and posterior circulations are patent without luminal irregularity. No basilar tip aneurysms. The V4 segments are symmetric and normal in appearance. No variant anatomy.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.  Adequate opacification the dural venous sinuses revealing codominant transverse and sigmoid sinuses. No filling defects identified.      IMPRESSION:    Patent circle of Willis vasculature, without evidence of aneurysm or large vessel occlusion.          3NP1IMG_PS03",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "NONE"
+        ]
+      },
+      {
+        "case_id": "101047983_20241218_19554800",
+        "modality": "CTA",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION:  CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY:  Neuro deficit  acute  stroke suspected COMPARISON:  None. TECHNIQUE: Head CTA with multi-planar MIP and volumetric rendering (3D) after bolus intravenous iodinated contrast administration was performed. All CT images were acquired using low-dose technique with automated exposure control. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large vessel occlusion.  IMPRESSION:  Occlusive thrombus in the M1 and M2 segments of the left MCA with the subtle cortical leptomeningeal collaterals. The ICAs ACAs and right MCA are patent. The posterior circulation is unremarkable. The posterior commuting arteries are not visualized. There is no definite aneurysm or vascular malformation. Findings discussed with  Shokraneh-Kenari, Keyon, MD  on 12/18/2024 7:56 PM , and the verbalized understanding of the report. 1RM1RADPS82",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "LMCA"
+        ]
+      },
+      {
+        "case_id": "021962121_20241220_18250500",
+        "modality": "CTA",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  Concurrent CT brain. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  Internal carotid arteries and proximal branches: Right: Patent. Left: Acute thrombus extending from the petrous/intracranial segment of the ICA to the ICA terminus. Occluded MCA. Occluded A1 segment of the ACA. Reconstitution of the A2 segment by the right ACA and anterior communicating artery. Vertebral arteries: Patent. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Right visualized. Left not well visualized. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  1.    Extensive acute thrombus involving the left intracranial ICA with complete occlusion of the left MCA and A1 segment of the ACA. 2.    Patent right MCA and ACA without evidence of high-grade stenosis.  3.    Patent posterior circulation without evidence of high-grade stenosis. 1RM1RAD_PS77",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "LMCA",
+          "LACA"
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Label acute/recent stroke territory from radiology text.\n\n/no_think\n\nReturn final answer only. Do not include hidden reasoning, scratchpad,\nchain-of-thought, analysis, self-correction, or explanation.\n\nReturn only allowed labels. Use NONE only when the report has no\nqualifying acute/recent/current territory evidence. Prefer the smaller\nlabel set when evidence is ambiguous, and never include NONE with a real\nterritory label.",
+      "fields": [
+        {
+          "prefix": "Case Id:",
+          "description": "Case identifier"
+        },
+        {
+          "prefix": "Modality:",
+          "description": "CT, CTA, CTP, or COMBINED"
+        },
+        {
+          "prefix": "Allowed Labels:",
+          "description": "Comma-separated allowed output labels"
+        },
+        {
+          "prefix": "Report:",
+          "description": "Relevant radiology report text"
+        },
+        {
+          "prefix": "Ct Labels:",
+          "description": "Preliminary CT labels, or NONE"
+        },
+        {
+          "prefix": "Cta Labels:",
+          "description": "Preliminary CTA labels, or NONE"
+        },
+        {
+          "prefix": "Ctp Labels:",
+          "description": "Preliminary CTP labels, or NONE"
+        },
+        {
+          "prefix": "Labels:",
+          "description": "A JSON-style list of labels chosen only from allowed_labels. Return labels only; no reasoning."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

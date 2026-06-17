@@ -20,9 +20,9 @@ CODE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CODE_DIR.parent
 FILES_DIR = PROJECT_ROOT / "Files"
 FILES_DIR_DEBUG = PROJECT_ROOT / "Files" / "Debug"
-FINISHED_CASES_ROOT = FILES_DIR / "finished_cases"
-GROUND_TRUTH_DIR = FILES_DIR / "GroundTruth"
-REPORTS_DIR = FILES_DIR / "Reports"
+FINISHED_CASES_ROOT = FILES_DIR / "Finished_Cases"
+GROUND_TRUTH_DIR = FILES_DIR / "GT"
+REPORTS_DIR = FILES_DIR / "Report"
 
 # Make sure all directories exist
 FILES_DIR.mkdir(exist_ok=True)
@@ -35,8 +35,8 @@ MODEL_NAME = "qwen3.6:latest"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 # Input/output files
-INPUT_REPORTS_FILE = REPORTS_DIR / "flagged_not_confident_cases_retest_input.xlsx"
-GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / ""
+INPUT_REPORTS_FILE = REPORTS_DIR / "New Reports.xlsx"
+GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / "GroundTruthKeyNew.xlsx"
 OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
 
 # ---------------------------------------------------------------------------

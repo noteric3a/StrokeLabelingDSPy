@@ -1,0 +1,101 @@
+{
+  "predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "case_id": "110120573_20220204_18010500",
+        "modality": "CTP",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION: CT BRAIN PERFUSION W RECON   CLINICAL HISTORY: LVO    COMPARISON:  None    TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size  was utilized for this examination. CT perfusion data was processed using automated software to assist stroke clinical decision-making.    FINDINGS:    Hypoperfusion volume (Tmax > 6 s, includes core and penumbra): 0 mL  Infarct core volume (CBF <30% of contralateral): 0 mL        IMPRESSION:    No perfusion deficits as described.        HMRM-WPHYRRS",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "NONE"
+        ]
+      },
+      {
+        "case_id": "000935015_20220606_07274100",
+        "modality": "CTP",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION: CT BRAIN PERFUSION W RECON   CLINICAL HISTORY: ams  weakness    COMPARISON:  None    TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size  was utilized for this examination.    FINDINGS:    No areas of abnormal hypoperfusion identified. Most recent CT head and CTA head demonstrate no evidence of cytotoxic edema or large vessel occlusion.    Hypoperfusion volume (Tmax > 6 s, includes core and penumbra): 0 mL  Infarct core volume (CBF <30% of contralateral): 0 mL  Mismatch (penumbra) volume: 0 mL  Mismatch ratio: 0    Other: None.        IMPRESSION:    No regions of hypoperfusion.          3NP1IMG_PS03",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "NONE"
+        ]
+      },
+      {
+        "case_id": "101047983_20241218_19554800",
+        "modality": "CTP",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: left m1 occlusion  COMPARISON:  None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size  was utilized for this examination. FINDINGS: The CTA of the head demonstrates large occlusive thrombus in the M1 and M2 segment of the left MCA with collateral cortical leptomeningeal circulation. The CT of the head demonstrates acute ischemic changes in the left basal ganglia and left corona  radiata with aspect score of about 8. Hypoperfusion volume in the left MCA territory (Tmax > 6 s, includes core and penumbra): 40 mL Infarct core volume (CBF <30% of contralateral): 0 mL Mismatch (penumbra) volume: 40 mL Mismatch ratio: Infinite Other: None.  IMPRESSION:  1. Perfusion deficit involving the left MCA with infarct core volume of 0 mL, mismatch volume of 40 mL, with a mismatch ratio of infinite. 1RM1RADPS82",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "LMCA"
+        ]
+      },
+      {
+        "case_id": "021962121_20241220_18250500",
+        "modality": "CTP",
+        "allowed_labels": "NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA",
+        "report": "EXAMINATION:  CT BRAIN PERFUSION W RECON COMPARISON:  CT scan of the head obtained at 6:25 PM. CLINICAL HISTORY:  stroke COMMENTS:  Axial postcontrast CT scan slices of the head were obtained. Postprocessing for angiographic evaluation including 3-D reconstructions was obtained. FINDINGS:  Left-sided cord infarct by CBF less than 30% is 332 mL. Left-sided hypoperfusion by Tmax greater than 6 seconds is 343 mm. Mismatch volume is 11 mm. mismatch ratio is 1.  IMPRESSION:  Left-sided infarct and hypoperfusion as described above. 1RM1RAD_PS02",
+        "ct_labels": "NONE",
+        "cta_labels": "NONE",
+        "ctp_labels": "NONE",
+        "labels": [
+          "LPICA"
+        ]
+      }
+    ],
+    "signature": {
+      "instructions": "Label acute/recent stroke territory from radiology text.\n\n/no_think\n\nReturn final answer only. Do not include hidden reasoning, scratchpad,\nchain-of-thought, analysis, self-correction, or explanation.\n\nReturn only allowed labels. Use NONE only when the report has no\nqualifying acute/recent/current territory evidence. Prefer the smaller\nlabel set when evidence is ambiguous, and never include NONE with a real\nterritory label.",
+      "fields": [
+        {
+          "prefix": "Case Id:",
+          "description": "Case identifier"
+        },
+        {
+          "prefix": "Modality:",
+          "description": "CT, CTA, CTP, or COMBINED"
+        },
+        {
+          "prefix": "Allowed Labels:",
+          "description": "Comma-separated allowed output labels"
+        },
+        {
+          "prefix": "Report:",
+          "description": "Relevant radiology report text"
+        },
+        {
+          "prefix": "Ct Labels:",
+          "description": "Preliminary CT labels, or NONE"
+        },
+        {
+          "prefix": "Cta Labels:",
+          "description": "Preliminary CTA labels, or NONE"
+        },
+        {
+          "prefix": "Ctp Labels:",
+          "description": "Preliminary CTP labels, or NONE"
+        },
+        {
+          "prefix": "Labels:",
+          "description": "A JSON-style list of labels chosen only from allowed_labels. Return labels only; no reasoning."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.14",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

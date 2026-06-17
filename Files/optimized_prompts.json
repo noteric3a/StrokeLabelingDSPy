@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "created_at": "2026-06-17T10:38:23",
-  "optimizer": "MIPROv2",
+  "created_at": "2026-06-17T11:14:34",
+  "optimizer": "LabeledFewShot",
   "auto": "light",
   "model": "qwen3.6:latest",
   "train_limit": 60,
@@ -11,9 +11,424 @@
   "ground_truth_file": "C:\\Users\\a839o\\Documents\\VSC\\StrokeLabelingDSPy\\Files\\GT\\GroundTruthKeyNew.xlsx",
   "modalities": {
     "CT": {
-      "enabled": false,
-      "error": "AdapterParseError('The LM returned an empty or null response.\\n\\nAdapter JSONAdapter failed to parse the LM response. \\n\\nLM Response: {\\'text\\': \\'\\', \\'reasoning_content\\': \\'Here\\\\\\'s a thinking process:\\\\n\\\\n1.  **Analyze User Input:**\\\\n   - `task_demos`: None provided.\\\\n   - `basic_instruction`: \"Label acute/recent stroke territory from radiology text. Return only allowed labels. Use NONE only when the report has no qualifying acute/recent/current territory evidence. Prefer the smaller label set when evidence is ambiguous, and never include NONE with a real territory label.\"\\\\n   - `tip`: \"The instruction should include a high stakes scenario in which the LM must solve the task!\"\\\\n   - Output format: JSON with `proposed_instruction`.\\\\n\\\\n2.  **Deconstruct the Task:**\\\\n   - **Goal:** Extract/label the acute/recent stroke territory from radiology text (reports).\\\\n   - **Constraints:**\\\\n     - Return only allowed labels.\\\\n     - Use \"NONE\" only if no qualifying evidence exists.\\\\n     - Prefer smaller label set for ambiguity.\\\\n     - Never mix \"NONE\" with a real territory label.\\\\n   - **Context/Scenario (from tip):** High stakes scenario. This implies I should frame the prompt in a critical medical context where accuracy is vital (e.g., triaging a stroke patient, making treatment decisions like thrombolysis/thrombectomy, preventing neurological deterioration).\\\\n\\\\n3.  **Brainstorming & Incorporating Constraints:**\\\\n   - Need to explicitly state the allowed labels? The basic instruction says \"Return only allowed labels\" but doesn\\\\\\'t list them. I should probably mention that the model should stick to a predefined set or standard stroke territories (e.g., MCA, ACA, PCA, Brainstem/Cerebellar, etc.) or just emphasize strict adherence to the provided/standard label set. Since I don\\\\\\'t have the exact list, I\\\\\\'ll phrase it generally but firmly: \"You must only output one of the following valid territory labels...\"\\\\n   - High stakes scenario: \"You are an AI medical assistant assisting a stroke code team in a high-stakes emergency department. Precise identification of the acute ischemic stroke territory is critical for determining eligibility for thrombolytic therapy and mechanical thrombectomy, directly impacting patient outcomes and survival.\"\\\\n   - Integrate constraints: \"Analyze the provided radiology report text to identify the acute/recent stroke territory. Return ONLY the most appropriate single label from the allowed set. Use \\\\\\'NONE\\\\\\' exclusively if there is absolutely no qualifying evidence of an acute or recent infarct. If clinical/radiological evidence is ambiguous, default to the more specific/smaller labeled territory rather than a broader one. Under no circumstances should you output \\\\\\'NONE\\\\\\' alongside any other territory label.\"\\\\n\\\\n4.  **Draft Construction (Mental Refinement):**\\\\n   Let\\\\\\'s combine these elements into a cohesive prompt instruction that follows standard LM prompting best practices and matches the required structure.\\\\n   *Structure:*\\\\n   - Context/Role: High-stakes stroke code context.\\\\n   - Task: Identify acute/recent stroke territory from radiology text.\\\\n   - Output rules: Strict labeling, NONE condition, ambiguity rule, single output rule.\\\\n   - Format: JSON or plain text? The basic instruction says \"Return only allowed labels.\" I\\\\\\'ll keep it strict.\\\\n\\\\n   *Draft:*\\\\n   You are an AI clinical decision support assistant operating in a high-stakes emergency stroke code setting. Accurate identification of the affected vascular territory is critical for determining thrombolysis eligibility and mechanical thrombectomy targets, directly impacting immediate patient survival and long-term neurological outcomes. \\\\n\\\\n   Your task is to analyze the provided radiology report text and determine the acute or recent ischemic stroke territory. You must adhere strictly to the following rules:\\\\n   1. Return ONLY a single label from the allowed stroke territory set. \\\\n   2. Use the label \"NONE\" exclusively if the report contains absolutely no qualifying evidence of an acute, recent, or current infarct in any specific territory.\\\\n   3. If the radiological evidence is ambiguous or overlaps between regions, prefer the more specific/smaller labeled territory.\\\\n   4. Never combine \"NONE\" with a real territory label; they are mutually exclusive.\\\\n   5. Output only the label itself, with no additional text, explanations, or formatting.\\\\n\\\\n   Radiology Report: {text}\\\\n   Territory Label:\\\\n\\\\n5.  **Check against Constraints:**\\\\n   - Labels acute/recent stroke territory? Yes.\\\\n   - Return only allowed labels? Yes, explicitly stated.\\\\n   - Use NONE only when no evidence? Yes.\\\\n   - Prefer smaller label set when ambiguous? Yes.\\\\n   - Never include NONE with real territory label? Yes.\\\\n   - High stakes scenario included? Yes, stroke code/emergency department context emphasizing survival/treatment eligibility.\\\\n   - Output format: JSON with `proposed_instruction`.\\\\n\\\\n   The draft looks solid. I will refine it slightly to ensure it flows well as a single prompt instruction and matches the exact requested output structure. I\\\\\\'ll make sure the high-stakes aspect is prominent upfront as requested by the tip.\\\\n\\\\n   One minor adjustment: The prompt says \"Return only allowed labels.\" I should probably frame it so the LM knows it\\\\\\'s working within a defined schema without needing me to invent the list, or just state \"allowed labels\" generally but firmly. I\\\\\\'ll keep it as is, it\\\\\\'s standard for these tasks.\\\\n\\\\n   Let\\\\\\'s construct the final JSON.\\\\n   Structure:\\\\n   {\\\\n     \"proposed_instruction\": \"You are an AI clinical decision support assistant integrated into a high-stakes emergency stroke code protocol. Precise identification of the affected vascular territory is critical for determining thrombolysis eligibility and mechanical thrombectomy targets, directly impacting immediate patient survival and long-term neurological outcomes.\\\\\\\\n\\\\\\\\nYour task is to analyze the provided radiology report text and label the acute or recent ischemic stroke territory. You must strictly adhere to the following constraints:\\\\\\\\n1. Return ONLY a single label from the allowed stroke territory set.\\\\\\\\n2. Use the label \\\\\\\\\"NONE\\\\\\\\\" exclusively if the report contains absolutely no qualifying evidence of an acute, recent, or current infarct in any specific vascular territory.\\\\\\\\n3. If radiological evidence is ambiguous or spans multiple regions, prefer the more specific/smaller labeled territory.\\\\\\\\n4. Never output \\\\\\\\\"NONE\\\\\\\\\" alongside any other valid territory label; they are strictly mutually exclusive.\\\\\\\\n5. Output only the raw label itself, with no additional text, explanations, or formatting.\\\\\\\\n\\\\\\\\nRadiology Report: {text}\\\\\\\\nTerritory Label:\"\\\\n   }\\\\n\\\\n   Wait, the tip says \"The instruction should include a high stakes scenario in which the LM must solve the task!\" I\\\\\\'ll make sure that\\\\\\'s clearly integrated. The draft does this well.\\\\n   I will output exactly this JSON.\\\\n   Check format: `proposed_instruction` string. All good.\\\\n   Proceed. \\\\n   Self-Correction/Refinement during thought: \\\\n   Should I explicitly mention that the model should just output the label? Yes, constraint 5 covers it. The basic instruction says \"Return only allowed labels.\" so that\\\\\\'s covered.\\\\n   I\\\\\\'ll ensure the JSON is properly escaped if needed, but standard string formatting is fine.\\\\n   All constraints met. Output matches requirement.\u2705\\\\n   Generate. \\\\n   Output matches the final refined version. \\\\n   Proceeds. \\\\n   [Output Generation] -> JSON object.\u2705\\\\n   *(Self-Correction/Verification during drafting)*: \\\\n   Let\\\\\\'s verify the exact wording of the tip: \"The instruction should include a high stakes scenario in which the LM must solve the task!\"\\\\n   I\\\\\\'ll make sure the scenario is explicit and central to the prompt.\\\\n   \"You are acting as a critical care AI triage assistant in a high-stakes emergency stroke unit where delayed or incorrect territory identification can lead to irreversible neurological damage, treatment failure, or death. Accurately labeling the acute/recent stroke territory from radiology text is vital for determining immediate thrombolytic or thrombectomy eligibility.\"\\\\n   This is stronger. I\\\\\\'ll integrate this opening.\\\\n   Then\\'} \\n\\nExpected to find output fields in the LM response: [proposed_instruction] \\n\\n')",
-      "guidance_text": ""
+      "enabled": true,
+      "train_count": 40,
+      "val_count": 0,
+      "baseline_score": null,
+      "optimized_score": null,
+      "program_path": "C:\\Users\\a839o\\Documents\\VSC\\StrokeLabelingDSPy\\Files\\optimized_prompts_dspy_artifacts\\ct_dspy_program.json",
+      "instructions": "Basic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels",
+      "few_shot_examples": [
+        {
+          "case_id": "110120573_20220204_18010500",
+          "modality": "CT",
+          "report_excerpt": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. FINDINGS: There is evidence of acute right MCA territorial infarction with loss of cortical gray-white matter differentiation of the mid lateral right precentral gyrus (series 303, image...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "modality": "CT",
+          "report_excerpt": "EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: August 21, 2020. CLINICAL HISTORY: Neuro deficit acute stroke suspected COMMENTS: Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS: There is subtle cortical and subcortical low density at the left parietal lobe which is a progressive finding compared to the previous study. There is mild mucosal thickening in the visualized sinuses. There is calc...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "modality": "CT",
+          "report_excerpt": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. All CT images were acquired using low-dose technique with automated exposure control. IMPRESSION: Large occlusive hypodense clot in the M1 and M2 segment of the left MCA with acute infarction in the left basal ganglia and left corona radiata with is elevation of the cortical gray matter and an ASPECT score of approximately 8. There is no acute hemorrhage or mass effect. There is no midline shift. The ventricles are normal in size. The basal cisterns are patent. The calvarium is...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "modality": "CT",
+          "report_excerpt": "EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None TECHNIQUE: Noncontrast CT of the brain was performed. Both soft tissue and bone reconstruction algorithms are interpreted. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is an acute infarct involving the entire left MCA and ACA territories (Aspects 0). There is mild local mass effect with some narrowing of the sulci. There is no midline shift. No hemorrhage is seen. The left carotid ter...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        }
+      ],
+      "guidance_text": "Optimized instruction summary:\nBasic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels\nSelected DSPy few-shot examples to follow:\n1. Report excerpt: EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. FINDINGS: There is evidence of acute right MCA territorial infarction with loss of cortical gray-white matter differentiation of the mid lateral right precentral gyrus (series 303, image...\n   Expected CT labels: RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA\n2. Report excerpt: EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: August 21, 2020. CLINICAL HISTORY: Neuro deficit acute stroke suspected COMMENTS: Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS: There is subtle cortical and subcortical low density at the left parietal lobe which is a progressive finding compared to the prev\n[TRUNCATED DSPy guidance to avoid prompt bloat]",
+      "notes": []
+    },
+    "CTA": {
+      "enabled": true,
+      "train_count": 40,
+      "val_count": 0,
+      "baseline_score": null,
+      "optimized_score": null,
+      "program_path": "C:\\Users\\a839o\\Documents\\VSC\\StrokeLabelingDSPy\\Files\\optimized_prompts_dspy_artifacts\\cta_dspy_program.json",
+      "instructions": "Basic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels",
+      "few_shot_examples": [
+        {
+          "case_id": "110120573_20220204_18010500",
+          "modality": "CTA",
+          "report_excerpt": "EXAM: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected TECHNIQUE: Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images. CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. COMPARI...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "modality": "CTA",
+          "report_excerpt": "EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None TECHNIQUE: Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the d...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "modality": "CTA",
+          "report_excerpt": "EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. TECHNIQUE: Head CTA with multi-planar MIP and volumetric rendering (3D) after bolus intravenous iodinated contrast administration was performed. All CT images were acquired using low-dose technique with automated exposure control. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large vessel occlusion. IMPRESSION: Occlusive thrombus in the M1 and M2 segments of the left MCA with...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "modality": "CTA",
+          "report_excerpt": "EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: Concurrent CT brain. TECHNIQUE: Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        }
+      ],
+      "guidance_text": "Optimized instruction summary:\nBasic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels\nSelected DSPy few-shot examples to follow:\n1. Report excerpt: EXAM: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected TECHNIQUE: Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images. CT scans are performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. COMPARI...\n   Expected CTA labels: RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA\n2. Report excerpt: EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None TECHNIQUE: Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificia\n[TRUNCATED DSPy guidance to avoid prompt bloat]",
+      "notes": []
+    },
+    "CTP": {
+      "enabled": true,
+      "train_count": 40,
+      "val_count": 0,
+      "baseline_score": null,
+      "optimized_score": null,
+      "program_path": "C:\\Users\\a839o\\Documents\\VSC\\StrokeLabelingDSPy\\Files\\optimized_prompts_dspy_artifacts\\ctp_dspy_program.json",
+      "instructions": "Basic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels",
+      "few_shot_examples": [
+        {
+          "case_id": "110120573_20220204_18010500",
+          "modality": "CTP",
+          "report_excerpt": "EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: LVO COMPARISON: None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size was utilized for this examination. CT perfusion data was processed using automated software to assist stroke clinical decision-making. FINDINGS: Hypoperfusion volume (Tmax > 6 s, includes core and penumbra): 0 mL Infarct core volume (CBF <30% of contralateral): 0 mL...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "modality": "CTP",
+          "report_excerpt": "EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: ams weakness COMPARISON: None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size was utilized for this examination. FINDINGS: No areas of abnormal hypoperfusion identified. Most recent CT head and CTA head demonstrate no evidence of cytotoxic edema or large vessel occlusion. Hypoperfusion volume (Tmax > 6 s, includes core and penumbra):...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "modality": "CTP",
+          "report_excerpt": "EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: left m1 occlusion COMPARISON: None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size was utilized for this examination. FINDINGS: The CTA of the head demonstrates large occlusive thrombus in the M1 and M2 segment of the left MCA with collateral cortical leptomeningeal circulation. The CT of the head demonstrates acute ischemic changes...",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "modality": "CTP",
+          "report_excerpt": "EXAMINATION: CT BRAIN PERFUSION W RECON COMPARISON: CT scan of the head obtained at 6:25 PM. CLINICAL HISTORY: stroke COMMENTS: Axial postcontrast CT scan slices of the head were obtained. Postprocessing for angiographic evaluation including 3-D reconstructions was obtained. FINDINGS: Left-sided cord infarct by CBF less than 30% is 332 mL. Left-sided hypoperfusion by Tmax greater than 6 seconds is 343 mm. Mismatch volume is 11 mm. mismatch ratio is 1. IMPRESSION: Left-sided infarct and hypoperfusion as described above. 1RM1RAD_PS02",
+          "ct_labels": "NONE",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        }
+      ],
+      "guidance_text": "Optimized instruction summary:\nBasic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels\nSelected DSPy few-shot examples to follow:\n1. Report excerpt: EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: LVO COMPARISON: None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size was utilized for this examination. CT perfusion data was processed using automated software to assist stroke clinical decision-making. FINDINGS: Hypoperfusion volume (Tmax > 6 s, includes core and penumbra): 0 mL Infarct core volume (CBF <30% of contralateral): 0 mL...\n   Expected CTP labels: RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA\n2. Report excerpt: EXAMINATION: CT BRAIN PERFUSION W RECON CLINICAL HISTORY: ams weakness COMPARISON: None TECHNIQUE: Whole brain CT perfusion was performed after administration of IV contrast. Post processing was performed. Dose lowering technique(s) such as automated exposure control, iterative reconstruction, and mA and/or KV adjustment for patient size was utilized for this examination. FINDINGS: No areas of abnormal hypoperfusion identified. Most recent CT head and CTA head demonstrate no evidence of cytotoxic edema or\n[TRUNCATED DSPy guidance to avoid prompt bloat]",
+      "notes": []
+    },
+    "COMBINED": {
+      "enabled": true,
+      "train_count": 40,
+      "val_count": 0,
+      "baseline_score": null,
+      "optimized_score": null,
+      "program_path": "C:\\Users\\a839o\\Documents\\VSC\\StrokeLabelingDSPy\\Files\\optimized_prompts_dspy_artifacts\\combined_dspy_program.json",
+      "instructions": "Basic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels",
+      "few_shot_examples": [
+        {
+          "case_id": "110120573_20220204_18010500",
+          "modality": "COMBINED",
+          "report_excerpt": "CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. FINDINGS: There is evidence of acute right MCA territorial infarction with loss of cortical gray-white matter differentiation of the mid lateral right precentral gyrus (series...",
+          "ct_labels": "RMCA",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "000935015_20220606_07274100",
+          "modality": "COMBINED",
+          "report_excerpt": "CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: August 21, 2020. CLINICAL HISTORY: Neuro deficit acute stroke suspected COMMENTS: Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS: There is subtle cortical and subcortical low density at the left parietal lobe which is a progressive finding compared to the previous study. There is mild mucosal thickening in the visualized sinuses. Th...",
+          "ct_labels": "LPCA",
+          "cta_labels": "NONE",
+          "ctp_labels": "NONE",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "101047983_20241218_19554800",
+          "modality": "COMBINED",
+          "report_excerpt": "CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. All CT images were acquired using low-dose technique with automated exposure control. IMPRESSION: Large occlusive hypodense clot in the M1 and M2 segment of the left MCA with acute infarction in the left basal ganglia and left corona radiata with is elevation of the cortical gray matter and an ASPECT score of approximately 8. There is no acute hemorrhage or mass effect. There is no midline shift. The ventricles are normal in size. The basal cisterns are patent. The ca...",
+          "ct_labels": "LMCA",
+          "cta_labels": "LMCA",
+          "ctp_labels": "LMCA",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        },
+        {
+          "case_id": "021962121_20241220_18250500",
+          "modality": "COMBINED",
+          "report_excerpt": "CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None TECHNIQUE: Noncontrast CT of the brain was performed. Both soft tissue and bone reconstruction algorithms are interpreted. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is an acute infarct involving the entire left MCA and ACA territories (Aspects 0). There is mild local mass effect with some narrowing of the sulci. There is no midline shift. No hemorrhage is seen. The left...",
+          "ct_labels": "LMCA, LACA",
+          "cta_labels": "LMCA, LACA",
+          "ctp_labels": "LPICA",
+          "labels": [
+            "RMCA",
+            "LMCA",
+            "RACA",
+            "LACA",
+            "RPCA",
+            "LPCA",
+            "RPICA",
+            "LPICA",
+            "BA",
+            "RVA",
+            "LVA",
+            "RICA",
+            "LICA"
+          ]
+        }
+      ],
+      "guidance_text": "Optimized instruction summary:\nBasic DSPy module that maps inputs to outputs using a language model.\n\nArgs:\n    signature: The input/output signature describing the task.\n    callbacks: Optional list of callbacks for instrumentation.\n    **config: Default keyword arguments forwarded to the underlying\n        language model. These values can be overridden for a single\n        invocation by passing a ``config`` dictionary when calling the\n        module. For example::\n\n            predict = dspy.Predict(\"q -> a\", rollout_id=1, temperature=1.0)\n            predict(q=\"What is 1 + 52?\", config={\"rollout_id\": 2, \"temperature\": 1.0})\n\nstr(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to 'utf-8'.\nerrors defaults to 'strict'.\n\ncase_id, modality, allowed_labels, report, ct_labels, cta_labels, ctp_labels -> labels\nSelected DSPy few-shot examples to follow:\n1. Report excerpt: CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST CLINICAL HISTORY: Neuro deficit acute stroke suspected COMPARISON: None. TECHNIQUE: Noncontrast head CT performed using radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image. FINDINGS: There is evidence of acute right MCA territorial infarction with loss of cortical gray-white matter differentiation of the mid lateral right precentral gyrus (series...\n   Expected COMBINED labels: RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA\n2. Report excerpt: CT Report: EXAMINATION: CT STROKE BRAIN WO CONTRAST COMPARISON: August 21, 2020. CLINICAL HISTORY: Neuro deficit acute stroke suspected COMMENTS: Axial noncontrast CT scan slices of the head were obtained. Sagittal and coronal reconstructions were obtained. CT imaging was performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. FINDINGS: There is subtle cortical and subcortical low density at the left parietal lobe which is a progressive finding com\n[TRUNCATED DSPy guidance to avoid prompt bloat]",
+      "notes": []
     }
   }
 }
