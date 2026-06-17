@@ -223,6 +223,18 @@ CTA-specific rules:
 - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
 - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
   unless your project rules say they qualify.
+
+Output rules:
+- Reasoning must be 1 sentence.
+- Labels must be only comma-separated allowed labels.
+- No step-by-step reasoning.
+- No markdown.
+- No JSON unless DSPy requires it.
+- Do not include extra commentary before or after the answer.
+
+Your output must include:
+1. Reasoning: One brief sentence supporting the final labels.
+2. Labels: Comma-separated final labels using only allowed labels.
 """
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""
