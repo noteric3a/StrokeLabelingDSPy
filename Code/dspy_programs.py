@@ -26,6 +26,7 @@ def configure_dspy() -> None:
         api_base=cfg.DSPY_API_BASE,
         temperature=cfg.DSPY_TEMPERATURE,
         max_tokens=cfg.DSPY_MAX_TOKENS,
+        think=False,  # We handle CoT manually in the Combined program, so disable automatic thinking in DSPy.
     )
     dspy.configure(lm=lm)
 
