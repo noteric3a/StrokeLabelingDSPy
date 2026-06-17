@@ -42,6 +42,9 @@ BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
 # output for parse/truncation errors into the timestamped optimization folder.
 DSPY_SAVE_HISTORY_ON_ERROR = True
 DSPY_ERROR_HISTORY_SIZE = 3
+# dspy_train.py writes baseline_predictions.json / optimized_predictions.json
+# so you can see every raw label, normalized label, gold label, and match status.
+DSPY_SAVE_ALL_PREDICTIONS = True
 
 # When enabled, main.py writes each run into a unique timestamped folder.
 # Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
@@ -237,6 +240,11 @@ CTA-specific rules:
 - Do not use RCA/LCA for carotid terminus.
 - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
 - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+- Do not include NONE with any positive label. If the answer is NONE, output only NONE.
+- Never output every allowed label. Output only labels directly supported by the report.
+- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute territory is clearly stated.
+- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute territory is clearly stated.
+- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA maps to LPCA.
 - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
   unless your project rules say they qualify.
 
