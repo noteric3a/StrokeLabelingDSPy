@@ -1,0 +1,25 @@
+Report type: CTA
+Created at: 2026-06-17T13:51:29
+Run folder: Files\Results\DSPy_Optimization_Runs\CTA\20260617_134943_iter_0001
+
+Accuracy by split:
+baseline train: 21.43% (6/28)
+baseline dev: 33.33% (2/6)
+baseline test: 0.00% (0/6)
+candidate train: N/A
+candidate dev: N/A
+candidate test: N/A
+active_after train: N/A
+active_after dev: N/A
+active_after test: N/A
+
+Candidate accepted as after prompt: False
+Acceptance reason: baseline-only mode
+Prompt quality check: not run
+
+Gold labels hidden from DSPy examples: True
+Instruction-only optimization: True
+MIPRO optimizer valset source: None
+MIPRO optimizer valset size: None
+Max bootstrapped demos: 0
+Max labeled demos: 0
