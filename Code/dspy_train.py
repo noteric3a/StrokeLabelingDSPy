@@ -436,6 +436,8 @@ def evaluate(
     examples: List[dspy.Example],
     name: str,
     error_log_path: Optional[Path] = None,
+    history_on_error_path: Optional[Path] = None,
+    history_size: int = 3,
 ) -> float:
     """
     Evaluate a DSPy program on exact-match accuracy.
@@ -454,12 +456,23 @@ def evaluate(
             if exact_match_metric(ex, pred) == 1.0:
                 correct += 1
         except Exception as exc:
+            case_id = str(getattr(ex, "case_id", ""))
             errors.append({
-                "case_id": getattr(ex, "case_id", ""),
+                "case_id": case_id,
                 "error_type": type(exc).__name__,
-                "error": str(exc)[:3000],
-                "ground_truth": getattr(ex, "labels", ""),
+                "error": str(exc)[:5000],
+                "ground_truth": str(getattr(ex, "labels", "")),
+                "report_text_preview": str(getattr(ex, "report_text", ""))[:1000],
             })
+
+            if history_on_error_path and bool(getattr(cfg, "DSPY_SAVE_HISTORY_ON_ERROR", True)):
+                append_dspy_history_on_error(
+                    history_on_error_path,
+                    case_id=case_id,
+                    error=exc,
+                    n=history_size,
+                )
+
             continue
 
     total = len(examples)
@@ -469,7 +482,7 @@ def evaluate(
         print(f"{name}: {correct}/{total} = {acc:.2%} ({len(errors)} parse/runtime errors counted as wrong)")
         if error_log_path:
             error_log_path.parent.mkdir(parents=True, exist_ok=True)
-            error_log_path.write_text(json.dumps(errors, indent=2), encoding="utf-8")
+            error_log_path.write_text(json.dumps(errors, indent=2, default=str), encoding="utf-8")
             print(f"Saved {name} evaluation errors to {error_log_path}")
     else:
         print(f"{name}: {correct}/{total} = {acc:.2%}")
@@ -512,6 +525,34 @@ def save_dspy_history(path: Path, n: int = 50) -> None:
 
     path.write_text(text, encoding="utf-8")
 
+
+
+
+
+def append_dspy_history_on_error(path: Path, *, case_id: str, error: Exception, n: int = 3) -> None:
+    """Append the latest visible DSPy LM history for a failed example.
+
+    This is for debugging truncation/parse failures. It captures the prompt and
+    response that DSPy can expose via dspy.inspect_history().
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            dspy.inspect_history(n=n)
+        history_text = buffer.getvalue()
+    except Exception as history_exc:
+        history_text = f"Could not inspect DSPy history: {history_exc}\n"
+
+    with path.open("a", encoding="utf-8") as f:
+        f.write("\n" + "=" * 100 + "\n")
+        f.write(f"Case ID: {case_id}\n")
+        f.write(f"Error type: {type(error).__name__}\n")
+        f.write(f"Error: {str(error)[:5000]}\n")
+        f.write("\n--- dspy.inspect_history() ---\n")
+        f.write(history_text)
+        f.write("\n")
 
 
 def save_program(program, path: Path) -> None:
@@ -593,6 +634,8 @@ def train_one(
         testset,
         f"{report_type} baseline",
         error_log_path=(run_dir / "baseline_evaluation_errors.json") if run_dir else None,
+        history_on_error_path=(run_dir / "baseline_dspy_history_on_errors.txt") if run_dir else None,
+        history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
     )
 
     if run_dir:
@@ -619,7 +662,7 @@ def train_one(
             "DSPy optimization failed during compile. The examples loaded correctly, "
             "but the model/adapter failed while testing candidate prompts. "
             "This is usually caused by truncated or unparsable model output. "
-            "Try increasing DSPY_MAX_TOKENS further or using a non-thinking Ollama model."
+            "Check *_dspy_history_on_errors.txt / dspy_history_after_compile_error.txt. If the history shows long reasoning_content or no final labels field, use a non-thinking Ollama model or a custom DSPy LM wrapper that passes think=False."
         ) from exc
 
     if run_dir:
@@ -631,6 +674,8 @@ def train_one(
         testset,
         f"{report_type} optimized",
         error_log_path=(run_dir / "optimized_evaluation_errors.json") if run_dir else None,
+        history_on_error_path=(run_dir / "optimized_dspy_history_on_errors.txt") if run_dir else None,
+        history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
     )
 
     if run_dir:

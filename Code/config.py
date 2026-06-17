@@ -23,7 +23,8 @@ from __future__ import annotations
 DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
-# DSPy needs enough room for local thinking models to finish the final structured answer.
+# Keep DSPy model outputs short enough to be parseable.
+# If inspect_history still shows truncation, try a non-thinking model or a custom Ollama LM wrapper.
 DSPY_MAX_TOKENS = 1200
 DSPY_PROGRAM_DIR = "optimized_programs"
 
@@ -32,9 +33,15 @@ MODEL_NAME = DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 REQUEST_TIMEOUT_SECONDS = 600
 NUM_PREDICT = DSPY_MAX_TOKENS
-NUM_CTX = DSPY_MAX_TOKENS
+# Context window should be larger than output tokens because DSPy adds instructions/few-shot demos.
+NUM_CTX = 8192
 OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
+
+# DSPy training debug logs. When True, dspy_train.py writes inspect_history()
+# output for parse/truncation errors into the timestamped optimization folder.
+DSPY_SAVE_HISTORY_ON_ERROR = True
+DSPY_ERROR_HISTORY_SIZE = 3
 
 # When enabled, main.py writes each run into a unique timestamped folder.
 # Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
@@ -206,6 +213,12 @@ CT-specific rules:
   corona radiata, centrum semiovale, insula, and operculum usually map to MCA territory.
 - Do not label chronic infarcts, old encephalomalacia, stable findings,
   artifacts, or nonspecific weak findings as acute stroke territories.
+
+Output rules:
+- Do not explain step by step.
+- Reasoning must be exactly one short sentence.
+- Labels must be only comma-separated allowed labels.
+- End immediately after the labels.
 """
 
 CTA_SIGNATURE_INSTRUCTIONS = f"""
@@ -246,6 +259,12 @@ CTP-specific rules:
 - Do not label tiny nonspecific artifacts or clearly non-territorial findings.
 - Prefer the tissue/perfusion territory over an upstream mechanism.
 - If RAPID/perfusion values say core and hypoperfusion are 0 mL, usually use NONE.
+
+Output rules:
+- Do not explain step by step.
+- Reasoning must be exactly one short sentence.
+- Labels must be only comma-separated allowed labels.
+- End immediately after the labels.
 """
 
 COMBINED_SIGNATURE_INSTRUCTIONS = f"""

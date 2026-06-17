@@ -340,7 +340,7 @@ CombinedStrokeSignature.__doc__ = cfg.COMBINED_SIGNATURE_INSTRUCTIONS
 class CTLabeler(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(CTStrokeSignature)
+        self.predict = dspy.Predict(CTStrokeSignature)
 
     def forward(self, report_text: str):
         return self.predict(report_text=report_text)
@@ -357,7 +357,7 @@ class CTALabeler(dspy.Module):
 class CTPLabeler(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(CTPStrokeSignature)
+        self.predict = dspy.Predict(CTPStrokeSignature)
 
     def forward(self, report_text: str):
         return self.predict(report_text=report_text)
