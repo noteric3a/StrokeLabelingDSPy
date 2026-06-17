@@ -20,9 +20,9 @@ CODE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CODE_DIR.parent
 FILES_DIR = PROJECT_ROOT / "Files"
 FILES_DIR_DEBUG = PROJECT_ROOT / "Files" / "Debug"
-FINISHED_CASES_ROOT = FILES_DIR / "finished_cases"
-GROUND_TRUTH_DIR = FILES_DIR / "GroundTruth"
-REPORTS_DIR = FILES_DIR / "Reports"
+FINISHED_CASES_ROOT = FILES_DIR / "Finished Cases"
+GROUND_TRUTH_DIR = FILES_DIR / "GT"
+REPORTS_DIR = FILES_DIR / "Report"
 
 # Make sure all directories exist
 FILES_DIR.mkdir(exist_ok=True)
@@ -35,8 +35,8 @@ MODEL_NAME = "qwen3.6:latest"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 # Input/output files
-INPUT_REPORTS_FILE = REPORTS_DIR / "flagged_not_confident_cases_retest_input.xlsx"
-GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / ""
+INPUT_REPORTS_FILE = REPORTS_DIR / "New Reports.xlsx"
+GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / "GroundTruthKeyNew.xlsx"
 OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
 
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
 # False: run the normal labeler pipeline.
 # True: run DSPy prompt optimization using the INPUT_REPORTS_FILE and
 # GROUND_TRUTH_FILE below, write OPTIMIZED_PROMPTS_FILE, then exit.
-RUN_PROMPT_OPTIMIZATION = False
+RUN_PROMPT_OPTIMIZATION = True
 
 # True: compare the generated JSON to GROUND_TRUTH_FILE after labeling.
 # False: label and convert output without validation.
@@ -57,7 +57,7 @@ RUN_VALIDATION_AFTER_LABELING = True
 
 # True: use the resumable ProcessingCache.
 # False: ignore the cache and reprocess all rows.
-USE_PROCESSING_CACHE = True
+USE_PROCESSING_CACHE = False
 
 # True: include *_reasoning fields in labeled_cases.json and the converted Excel file.
 # False: omit reasoning text from the final output JSON/Excel while still keeping
