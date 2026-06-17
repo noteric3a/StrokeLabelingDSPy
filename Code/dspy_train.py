@@ -99,6 +99,60 @@ def normalize_pred(value: Any) -> Set[str]:
     return set(normalize_labels(value))
 
 
+def example_value(example: Any, key: str, default: Any = None) -> Any:
+    """Return a DSPy Example field without accidentally reading methods.
+
+    DSPy Example has method names such as ``labels`` that can shadow fields.
+    Using ``example.labels`` can return a bound method instead of the stored
+    ground-truth label value.  This helper always tries mapping-style access
+    before attribute access and ignores callable attributes.
+    """
+
+    # Most DSPy Example objects support mapping-style access. Prefer this.
+    try:
+        return example[key]
+    except Exception:
+        pass
+
+    # Some versions expose .get(...).
+    try:
+        value = example.get(key, default)
+        if not callable(value):
+            return value
+    except Exception:
+        pass
+
+    # Last-resort support for internal dict-like stores across DSPy versions.
+    for attr_name in ("_store", "_data", "data", "store"):
+        try:
+            store = getattr(example, attr_name, None)
+            if isinstance(store, dict) and key in store:
+                return store[key]
+        except Exception:
+            pass
+
+    # Attribute access is last because Example.labels may be a method.
+    try:
+        value = getattr(example, key, default)
+        if not callable(value):
+            return value
+    except Exception:
+        pass
+
+    return default
+
+
+def example_case_id(example: Any) -> str:
+    return str(example_value(example, "case_id", "") or "")
+
+
+def example_report_text(example: Any) -> str:
+    return str(example_value(example, "report_text", "") or "")
+
+
+def example_gold_labels(example: Any) -> Any:
+    return example_value(example, "labels", "NONE")
+
 
 def normalize_case_id(value: Any) -> str:
     """
@@ -224,66 +278,6 @@ def _signature_instructions(report_type: str) -> str:
     return ""
 
 
-
-# =============================================================================
-# DSPy Example / Prediction access helpers
-# =============================================================================
-
-
-def _field_from_obj(obj: Any, field: str, default: Any = "") -> Any:
-    """Safely read a field from dspy.Example / dspy.Prediction / dict-like objects.
-
-    Important: dspy.Example has a method named labels(), so using
-    example.labels can return a bound method instead of the stored output field.
-    This helper prefers mapping-style access (example["labels"] / get) before
-    falling back to attributes.
-    """
-
-    if obj is None:
-        return default
-
-    # dspy.Example and dspy.Prediction are dict-like in recent DSPy versions.
-    try:
-        if hasattr(obj, "get"):
-            value = obj.get(field, default)  # type: ignore[attr-defined]
-            if not callable(value):
-                return value
-    except Exception:
-        pass
-
-    try:
-        value = obj[field]  # type: ignore[index]
-        if not callable(value):
-            return value
-    except Exception:
-        pass
-
-    value = getattr(obj, field, default)
-    if callable(value):
-        return default
-    return value
-
-
-def _example_case_id(example: dspy.Example) -> str:
-    return str(_field_from_obj(example, "case_id", ""))
-
-
-def _example_report_text(example: dspy.Example) -> str:
-    return str(_field_from_obj(example, "report_text", ""))
-
-
-def _example_gold_labels(example: dspy.Example) -> Any:
-    return _field_from_obj(example, "labels", "NONE")
-
-
-def _prediction_labels(pred: Any) -> Any:
-    return _field_from_obj(pred, "labels", "NONE")
-
-
-def _prediction_reasoning(pred: Any) -> str:
-    return str(_field_from_obj(pred, "reasoning", ""))
-
-
 # =============================================================================
 # DSPy metric
 # =============================================================================
@@ -295,13 +289,10 @@ def exact_match_metric(example, pred, trace=None) -> float:
 
     Returns 1.0 if the predicted label set exactly matches ground truth,
     otherwise 0.0.
-
-    Note: do not use example.labels here. In DSPy, labels can be a method on
-    Example, not the stored answer-key field. Use _example_gold_labels instead.
     """
 
-    gold = normalize_gt(_example_gold_labels(example))
-    predicted = normalize_pred(_prediction_labels(pred))
+    gold = normalize_gt(example_gold_labels(example))
+    predicted = normalize_pred(getattr(pred, "labels", "NONE"))
 
     return 1.0 if gold == predicted else 0.0
 
@@ -321,20 +312,20 @@ def get_optimizer(metric):
 
     try:
         return dspy.MIPROv2(metric=metric, auto="light")
+    except ImportError as exc:
+        raise ImportError(
+            "MIPROv2 requires optuna. Install it with: pip install \"dspy[optuna]\" "
+            "or run this script with --baseline-only while debugging predictions."
+        ) from exc
     except AttributeError:
         try:
             from dspy.teleprompt import MIPROv2
             return MIPROv2(metric=metric, auto="light")
         except ImportError as exc:
             raise ImportError(
-                "MIPROv2 needs Optuna. Install it with: pip install \"dspy[optuna]\" "
-                "or run this script with --skip-compile to only test baseline predictions."
+                "MIPROv2 requires optuna. Install it with: pip install \"dspy[optuna]\" "
+                "or run this script with --baseline-only while debugging predictions."
             ) from exc
-    except ImportError as exc:
-        raise ImportError(
-            "MIPROv2 needs Optuna. Install it with: pip install \"dspy[optuna]\" "
-            "or run this script with --skip-compile to only test baseline predictions."
-        ) from exc
 
 
 # =============================================================================
@@ -431,16 +422,16 @@ def load_examples(
             continue
 
         labels = gt_by_case[case_id]
+        label_text = ", ".join(sorted(normalize_gt(labels)))
 
-        normalized_label_text = ", ".join(sorted(normalize_gt(labels)))
+        # Include a simple reasoning value so DSPy few-shot demos do not show
+        # "Not supplied for this particular example" for the reasoning field.
+        # The metric still scores labels only.
         ex = dspy.Example(
             case_id=case_id,
             report_text=report_text,
-            labels=normalized_label_text,
-            # Reasoning is not used by the metric, but providing it prevents
-            # DSPy few-shot demos from showing "Not supplied for this example"
-            # for the reasoning output field.
-            reasoning=f"Answer-key labels: {normalized_label_text}.",
+            labels=label_text,
+            reasoning=f"Answer key label is {label_text}.",
         ).with_inputs("report_text")
 
         examples.append(ex)
@@ -510,6 +501,50 @@ def split_examples(examples: List[dspy.Example], seed: int = 42):
 # =============================================================================
 
 
+def prediction_debug_row(
+    *,
+    example: dspy.Example,
+    pred: Any | None = None,
+    error: Exception | None = None,
+) -> Dict[str, Any]:
+    """Build one JSON-serializable row explaining a prediction attempt."""
+
+    gold_raw = example_gold_labels(example)
+    gold = normalize_gt(gold_raw)
+    report_text = example_report_text(example)
+
+    row: Dict[str, Any] = {
+        "case_id": example_case_id(example),
+        "gold_raw": str(gold_raw),
+        "gold": sorted(gold),
+        "report_text_preview": report_text[:1000],
+    }
+
+    if error is not None:
+        row.update({
+            "status": "error",
+            "match": False,
+            "error_type": type(error).__name__,
+            "error": str(error)[:5000],
+        })
+        return row
+
+    raw_labels = getattr(pred, "labels", "NONE")
+    raw_reasoning = getattr(pred, "reasoning", "")
+    predicted = normalize_pred(raw_labels)
+    match = gold == predicted
+
+    row.update({
+        "status": "ok",
+        "match": match,
+        "predicted": sorted(predicted),
+        "raw_labels": str(raw_labels),
+        "raw_reasoning": str(raw_reasoning),
+        "raw_prediction_repr": repr(pred)[:3000],
+    })
+    return row
+
+
 def evaluate(
     program,
     examples: List[dspy.Example],
@@ -520,67 +555,34 @@ def evaluate(
     prediction_log_path: Optional[Path] = None,
 ) -> float:
     """
-    Evaluate a DSPy program on exact-match accuracy.
+    Evaluate a DSPy program on exact-match accuracy and save detailed logs.
 
-    This logs every prediction, not only parse/runtime errors. That makes it
-    clear whether a run is failing because DSPy cannot parse the model output,
-    or because the model returned valid but incorrect labels.
+    The prediction log is intentionally saved for every case, not just crashes,
+    because a response can be parseable but still unusable for DSPy bootstrapping
+    when its labels do not exactly match the answer key.
     """
 
     correct = 0
     errors: List[Dict[str, Any]] = []
-    predictions: List[Dict[str, Any]] = []
+    prediction_rows: List[Dict[str, Any]] = []
 
     for ex in examples:
-        case_id = _example_case_id(ex)
-        report_text = _example_report_text(ex)
-        gold_raw = _example_gold_labels(ex)
-        gold = normalize_gt(gold_raw)
-
         try:
-            pred = program(report_text=report_text)
-            raw_labels = _prediction_labels(pred)
-            raw_reasoning = _prediction_reasoning(pred)
-            predicted = normalize_pred(raw_labels)
-            match = gold == predicted
-
-            if match:
+            pred = program(report_text=example_report_text(ex))
+            row = prediction_debug_row(example=ex, pred=pred)
+            prediction_rows.append(row)
+            if row["match"]:
                 correct += 1
-
-            predictions.append({
-                "case_id": case_id,
-                "status": "ok",
-                "match": match,
-                "gold": sorted(gold),
-                "predicted": sorted(predicted),
-                "raw_gold_labels": str(gold_raw),
-                "raw_predicted_labels": str(raw_labels),
-                "raw_reasoning": raw_reasoning,
-                "report_text_preview": report_text[:1000],
-            })
-
         except Exception as exc:
-            error_row = {
+            case_id = example_case_id(ex)
+            row = prediction_debug_row(example=ex, error=exc)
+            prediction_rows.append(row)
+            errors.append({
                 "case_id": case_id,
                 "error_type": type(exc).__name__,
                 "error": str(exc)[:5000],
-                "gold": sorted(gold),
-                "raw_gold_labels": str(gold_raw),
-                "report_text_preview": report_text[:1000],
-            }
-            errors.append(error_row)
-            predictions.append({
-                "case_id": case_id,
-                "status": "error",
-                "match": False,
-                "gold": sorted(gold),
-                "predicted": [],
-                "raw_gold_labels": str(gold_raw),
-                "raw_predicted_labels": "",
-                "raw_reasoning": "",
-                "error_type": type(exc).__name__,
-                "error": str(exc)[:5000],
-                "report_text_preview": report_text[:1000],
+                "ground_truth": str(example_gold_labels(ex)),
+                "report_text_preview": example_report_text(ex)[:1000],
             })
 
             if history_on_error_path and bool(getattr(cfg, "DSPY_SAVE_HISTORY_ON_ERROR", True)):
@@ -595,20 +597,26 @@ def evaluate(
 
     total = len(examples)
     acc = correct / total if total else 0.0
+    error_count = len(errors)
+    wrong_count = total - correct - error_count
 
-    if errors:
-        print(f"{name}: {correct}/{total} = {acc:.2%} ({len(errors)} parse/runtime errors counted as wrong)")
-        if error_log_path:
-            error_log_path.parent.mkdir(parents=True, exist_ok=True)
-            error_log_path.write_text(json.dumps(errors, indent=2, default=str), encoding="utf-8")
-            print(f"Saved {name} evaluation errors to {error_log_path}")
-    else:
-        print(f"{name}: {correct}/{total} = {acc:.2%}")
+    print(
+        f"{name}: {correct}/{total} = {acc:.2%} "
+        f"({wrong_count} wrong, {error_count} parse/runtime errors)"
+    )
 
     if prediction_log_path:
         prediction_log_path.parent.mkdir(parents=True, exist_ok=True)
-        prediction_log_path.write_text(json.dumps(predictions, indent=2, default=str), encoding="utf-8")
+        prediction_log_path.write_text(
+            json.dumps(prediction_rows, indent=2, default=str),
+            encoding="utf-8",
+        )
         print(f"Saved {name} prediction details to {prediction_log_path}")
+
+    if errors and error_log_path:
+        error_log_path.parent.mkdir(parents=True, exist_ok=True)
+        error_log_path.write_text(json.dumps(errors, indent=2, default=str), encoding="utf-8")
+        print(f"Saved {name} evaluation errors to {error_log_path}")
 
     return acc
 
@@ -630,6 +638,81 @@ def make_optimization_run_dir(report_type: str, iteration: int) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
+
+def make_run_layout(run_dir: Path) -> Dict[str, Path]:
+    """Create the consolidated timestamped-folder layout.
+
+    Root: final summaries only.
+    debug/: raw prediction logs, error logs, DSPy history, example splits.
+    prompts/: before/after prompt text and saved DSPy program snapshots.
+    """
+
+    layout = {
+        "root": run_dir,
+        "debug": run_dir / "debug",
+        "prompts": run_dir / "prompts",
+    }
+
+    for path in layout.values():
+        path.mkdir(parents=True, exist_ok=True)
+
+    return layout
+
+
+def extract_program_instructions(program: Any) -> str:
+    """Best-effort extraction of a DSPy program's current prompt instructions."""
+
+    candidates = [
+        ("predict", "signature", "instructions"),
+        ("signature", "instructions"),
+    ]
+
+    for attrs in candidates:
+        value = program
+        try:
+            for attr in attrs:
+                value = getattr(value, attr)
+            if value:
+                return str(value)
+        except Exception:
+            pass
+
+    # Some DSPy versions store the signature as a dict-like object.
+    try:
+        signature = getattr(getattr(program, "predict", None), "signature", None)
+        if isinstance(signature, dict):
+            return str(signature.get("instructions", ""))
+    except Exception:
+        pass
+
+    return ""
+
+
+def save_accuracy_report(path: Path, summary: Dict[str, Any]) -> None:
+    """Write a short human-readable accuracy report for the run."""
+
+    baseline = summary.get("baseline_accuracy")
+    optimized = summary.get("optimized_accuracy")
+    test_count = summary.get("test_examples") or 0
+
+    def pct(value: Any) -> str:
+        return "N/A" if value is None else f"{float(value) * 100:.2f}%"
+
+    def count(value: Any) -> str:
+        if value is None or not test_count:
+            return "N/A"
+        return f"{round(float(value) * test_count)}/{test_count}"
+
+    lines = [
+        f"Report type: {summary.get('report_type')}",
+        f"Created at: {summary.get('created_at')}",
+        f"Run folder: {summary.get('timestamped_run_dir')}",
+        "",
+        f"Baseline accuracy: {pct(baseline)} ({count(baseline)})",
+        f"Optimized accuracy: {pct(optimized)} ({count(optimized)})",
+    ]
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def save_dspy_history(path: Path, n: int = 50) -> None:
@@ -678,6 +761,27 @@ def append_dspy_history_on_error(path: Path, *, case_id: str, error: Exception, 
         f.write("\n")
 
 
+
+def save_examples_debug(path: Path, *, trainset, devset, testset) -> None:
+    """Save split membership and resolved fields for debugging."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def rows(name: str, examples):
+        out = []
+        for ex in examples:
+            out.append({
+                "split": name,
+                "case_id": example_case_id(ex),
+                "labels": str(example_gold_labels(ex)),
+                "reasoning": str(example_value(ex, "reasoning", "")),
+                "report_text_preview": example_report_text(ex)[:500],
+            })
+        return out
+
+    payload = rows("train", trainset) + rows("dev", devset) + rows("test", testset)
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+
+
 def save_program(program, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -713,7 +817,8 @@ def train_one(
     iteration: int = 1,
     save_run_logs: bool = True,
     history_size: int = 50,
-    skip_compile: bool = False,
+    baseline_only: bool = False,
+    smoke_test: bool = False,
 ) -> Dict[str, Any]:
     """
     Optimize one modality-specific DSPy program.
@@ -725,9 +830,11 @@ def train_one(
     configure_dspy()
 
     run_dir: Optional[Path] = None
+    layout: Optional[Dict[str, Path]] = None
     if save_run_logs:
         run_dir = make_optimization_run_dir(report_type, iteration)
-        (run_dir / "base_signature_instructions.txt").write_text(
+        layout = make_run_layout(run_dir)
+        (layout["prompts"] / "before_prompt.txt").write_text(
             _signature_instructions(report_type),
             encoding="utf-8",
         )
@@ -749,28 +856,57 @@ def train_one(
     print(f"\nTraining {report_type}")
     print(f"Train: {len(trainset)} | Dev: {len(devset)} | Test: {len(testset)}")
 
-    if run_dir:
-        save_program(program, run_dir / "baseline_program.json")
+    if layout:
+        save_program(program, layout["prompts"] / "before_program.json")
+        save_examples_debug(layout["debug"] / "loaded_examples.json", trainset=trainset, devset=devset, testset=testset)
+
+    if smoke_test:
+        print("Running smoke test only: one DSPy prediction, no optimization.")
+        smoke_acc = evaluate(
+            program,
+            [testset[0]],
+            f"{report_type} smoke test",
+            error_log_path=(layout["debug"] / "smoke_test_errors.json") if layout else None,
+            history_on_error_path=(layout["debug"] / "smoke_test_dspy_history_on_errors.txt") if layout else None,
+            history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
+            prediction_log_path=(layout["debug"] / "smoke_test_predictions.json") if layout else None,
+        )
+        summary = {
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "iteration": iteration,
+            "report_type": report_type,
+            "mode": "smoke_test",
+            "smoke_test_accuracy": smoke_acc,
+            "timestamped_run_dir": str(run_dir) if run_dir else None,
+        }
+        if layout:
+            save_dspy_history(layout["debug"] / "dspy_history_after_smoke_test.txt", n=history_size)
+            (layout["root"] / "optimization_summary.json").write_text(
+                json.dumps(summary, indent=2),
+                encoding="utf-8",
+            )
+        return summary
 
     # Evaluate the unoptimized program first.
     baseline_acc = evaluate(
         program,
         testset,
         f"{report_type} baseline",
-        error_log_path=(run_dir / "baseline_evaluation_errors.json") if run_dir else None,
-        history_on_error_path=(run_dir / "baseline_dspy_history_on_errors.txt") if run_dir else None,
+        error_log_path=(layout["debug"] / "baseline_errors.json") if layout else None,
+        history_on_error_path=(layout["debug"] / "baseline_dspy_history_on_errors.txt") if layout else None,
         history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
-        prediction_log_path=(run_dir / "baseline_predictions.json") if run_dir else None,
+        prediction_log_path=(layout["debug"] / "baseline_predictions.json") if layout else None,
     )
 
-    if run_dir:
-        save_dspy_history(run_dir / "dspy_history_after_baseline_eval.txt", n=history_size)
+    if layout:
+        save_dspy_history(layout["debug"] / "dspy_history_after_baseline_eval.txt", n=history_size)
 
-    if skip_compile:
+    if baseline_only:
         summary = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "iteration": iteration,
             "report_type": report_type,
+            "mode": "baseline_only",
             "reports_file": str(reports_file),
             "ground_truth_file": str(ground_truth_file),
             "max_cases": max_cases,
@@ -780,18 +916,16 @@ def train_one(
             "test_examples": len(testset),
             "baseline_accuracy": baseline_acc,
             "optimized_accuracy": None,
-            "skipped_compile": True,
             "active_saved_program": None,
             "timestamped_run_dir": str(run_dir) if run_dir else None,
         }
-        if run_dir:
-            (run_dir / "optimization_summary.json").write_text(
+        if layout:
+            (layout["root"] / "optimization_summary.json").write_text(
                 json.dumps(summary, indent=2),
                 encoding="utf-8",
             )
-        print("Skipped DSPy compile/optimization because --skip-compile was set.")
-        if run_dir:
-            print(f"Saved baseline-only debug run to {run_dir}")
+            save_accuracy_report(layout["root"] / "accuracy_report.txt", summary)
+        print("Baseline-only mode: skipped MIPRO optimization.")
         return summary
 
     # Create optimizer.
@@ -805,9 +939,9 @@ def train_one(
             valset=devset,
         )
     except Exception as exc:
-        if run_dir:
-            save_dspy_history(run_dir / "dspy_history_after_compile_error.txt", n=history_size)
-            (run_dir / "compile_error.txt").write_text(
+        if layout:
+            save_dspy_history(layout["debug"] / "dspy_history_after_compile_error.txt", n=history_size)
+            (layout["debug"] / "compile_error.txt").write_text(
                 f"{type(exc).__name__}: {exc}",
                 encoding="utf-8",
             )
@@ -818,23 +952,27 @@ def train_one(
             "Check *_dspy_history_on_errors.txt / dspy_history_after_compile_error.txt. If the history shows long reasoning_content or no final labels field, use a non-thinking Ollama model or a custom DSPy LM wrapper that passes think=False."
         ) from exc
 
-    if run_dir:
-        save_dspy_history(run_dir / "dspy_history_after_compile.txt", n=history_size)
+    if layout:
+        save_dspy_history(layout["debug"] / "dspy_history_after_compile.txt", n=history_size)
 
     # Evaluate optimized program.
     optimized_acc = evaluate(
         optimized_program,
         testset,
         f"{report_type} optimized",
-        error_log_path=(run_dir / "optimized_evaluation_errors.json") if run_dir else None,
-        history_on_error_path=(run_dir / "optimized_dspy_history_on_errors.txt") if run_dir else None,
+        error_log_path=(layout["debug"] / "optimized_errors.json") if layout else None,
+        history_on_error_path=(layout["debug"] / "optimized_dspy_history_on_errors.txt") if layout else None,
         history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
-        prediction_log_path=(run_dir / "optimized_predictions.json") if run_dir else None,
+        prediction_log_path=(layout["debug"] / "optimized_predictions.json") if layout else None,
     )
 
-    if run_dir:
-        save_dspy_history(run_dir / "dspy_history_after_optimized_eval.txt", n=history_size)
-        save_program(optimized_program, run_dir / "optimized_program.json")
+    if layout:
+        save_dspy_history(layout["debug"] / "dspy_history_after_optimized_eval.txt", n=history_size)
+        save_program(optimized_program, layout["prompts"] / "after_program.json")
+        (layout["prompts"] / "after_prompt.txt").write_text(
+            extract_program_instructions(optimized_program),
+            encoding="utf-8",
+        )
 
     # Save active optimized program. Main labeling will load this automatically.
     Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
@@ -858,112 +996,28 @@ def train_one(
         "timestamped_run_dir": str(run_dir) if run_dir else None,
     }
 
-    if run_dir:
-        (run_dir / "optimization_summary.json").write_text(
+    if layout:
+        summary["folders"] = {
+            "debug": str(layout["debug"]),
+            "prompts": str(layout["prompts"]),
+        }
+        summary["prompt_files"] = {
+            "before_prompt": str(layout["prompts"] / "before_prompt.txt"),
+            "after_prompt": str(layout["prompts"] / "after_prompt.txt"),
+        }
+        (layout["root"] / "optimization_summary.json").write_text(
             json.dumps(summary, indent=2),
             encoding="utf-8",
         )
+        save_accuracy_report(layout["root"] / "accuracy_report.txt", summary)
 
     print(f"Saved optimized {report_type} program to {active_save_path}")
     if run_dir:
         print(f"Saved this optimization run to {run_dir}")
+        print(f"  Debug files:   {layout['debug'] if layout else None}")
+        print(f"  Prompt files:  {layout['prompts'] if layout else None}")
 
     return summary
-
-
-
-# =============================================================================
-# Single-example debugging
-# =============================================================================
-
-
-def debug_one_prediction(
-    report_type: str,
-    reports_file: str,
-    ground_truth_file: str,
-    max_cases: Optional[int] = None,
-    case_id: Optional[str] = None,
-    history_size: int = 5,
-) -> None:
-    """Run exactly one DSPy prediction and print/save the raw prediction.
-
-    Use this before MIPRO when debugging whether the model can produce one
-    parseable response.
-    """
-
-    report_type = report_type.upper()
-    configure_dspy()
-    examples = load_examples(
-        reports_file=reports_file,
-        ground_truth_file=ground_truth_file,
-        report_type=report_type,
-        max_cases=max_cases,
-    )
-
-    selected = None
-    if case_id:
-        for ex in examples:
-            if _example_case_id(ex) == str(case_id):
-                selected = ex
-                break
-        if selected is None:
-            raise ValueError(f"Could not find case_id={case_id!r} in loaded examples.")
-    else:
-        selected = examples[0]
-
-    program, _save_name = _program_for_report_type(report_type)
-    report_text = _example_report_text(selected)
-    gold_raw = _example_gold_labels(selected)
-    gold = normalize_gt(gold_raw)
-
-    print("\nSingle DSPy prediction debug")
-    print(f"  report_type: {report_type}")
-    print(f"  case_id:     {_example_case_id(selected)}")
-    print(f"  gold:        {sorted(gold)}")
-    print("\nReport preview:")
-    print(report_text[:1200])
-
-    run_dir = make_optimization_run_dir(report_type, 0)
-    try:
-        pred = program(report_text=report_text)
-        raw_labels = _prediction_labels(pred)
-        raw_reasoning = _prediction_reasoning(pred)
-        predicted = normalize_pred(raw_labels)
-        match = predicted == gold
-
-        print("\nRaw prediction object:")
-        print(pred)
-        print("\nParsed prediction:")
-        print(f"  raw_labels:   {raw_labels!r}")
-        print(f"  predicted:    {sorted(predicted)}")
-        print(f"  raw_reasoning:{raw_reasoning!r}")
-        print(f"  match:        {match}")
-
-        (run_dir / "debug_one_prediction.json").write_text(
-            json.dumps({
-                "case_id": _example_case_id(selected),
-                "report_type": report_type,
-                "gold": sorted(gold),
-                "raw_gold_labels": str(gold_raw),
-                "raw_predicted_labels": str(raw_labels),
-                "predicted": sorted(predicted),
-                "raw_reasoning": raw_reasoning,
-                "match": match,
-                "report_text_preview": report_text[:2000],
-            }, indent=2, default=str),
-            encoding="utf-8",
-        )
-    except Exception as exc:
-        print("\nPrediction failed:")
-        print(type(exc).__name__, str(exc))
-        (run_dir / "debug_one_error.txt").write_text(
-            f"{type(exc).__name__}: {exc}", encoding="utf-8"
-        )
-        append_dspy_history_on_error(run_dir / "debug_one_history_on_error.txt", case_id=_example_case_id(selected), error=exc, n=history_size)
-        raise
-    finally:
-        save_dspy_history(run_dir / "debug_one_dspy_history.txt", n=history_size)
-        print(f"\nSaved single-example debug files to {run_dir}")
 
 
 # =============================================================================
@@ -1026,35 +1080,21 @@ def main():
     )
 
     parser.add_argument(
-        "--skip-compile",
+        "--baseline-only",
         action="store_true",
-        help="Only run baseline evaluation/debug logs; do not run MIPRO optimization.",
+        help="Evaluate the baseline program and write prediction logs, but skip MIPRO/optuna optimization.",
     )
 
     parser.add_argument(
-        "--debug-one",
+        "--smoke-test",
         action="store_true",
-        help="Run exactly one prediction and save inspect_history output, then exit.",
-    )
-
-    parser.add_argument(
-        "--debug-case-id",
-        default=None,
-        help="Optional case ID to use with --debug-one.",
+        help="Run exactly one prediction and save its DSPy history/logs; skip splitting details beyond the normal run folder.",
     )
 
     args = parser.parse_args()
 
-    if args.debug_one:
-        debug_one_prediction(
-            report_type=args.report_type,
-            reports_file=args.reports_file,
-            ground_truth_file=args.ground_truth,
-            max_cases=args.max_cases,
-            case_id=args.debug_case_id,
-            history_size=args.history_size,
-        )
-        return
+    if args.smoke_test and args.loop:
+        raise ValueError("--smoke-test is intended for one debug run; remove --loop.")
 
     iteration = 1
 
@@ -1068,7 +1108,8 @@ def main():
                 iteration=iteration,
                 save_run_logs=not args.no_run_logs,
                 history_size=args.history_size,
-                skip_compile=args.skip_compile,
+                baseline_only=args.baseline_only,
+                smoke_test=args.smoke_test,
             )
 
             if not args.loop:

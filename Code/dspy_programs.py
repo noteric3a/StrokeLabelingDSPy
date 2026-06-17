@@ -367,7 +367,7 @@ class CTPLabeler(dspy.Module):
 class CombinedLabeler(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.Predict(CombinedStrokeSignature)
+        self.predict = dspy.ChainOfThought(CombinedStrokeSignature)
 
     def forward(
         self,
