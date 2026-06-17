@@ -1,0 +1,1 @@
+Analyze CTA report text to identify acute stroke-related vascular territory and label as NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.

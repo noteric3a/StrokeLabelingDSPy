@@ -1,0 +1,2765 @@
+
+
+
+
+[34m[2026-06-17T13:24:56.120836][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "Acute stroke suspected due to occlusion of the right MCA distal M1 segment."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.421537][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "The report describes complete occlusion of the distal right carotid terminus and right middle cerebral artery, indicating a high-grade stenosis or occlusion, which is consistent with an acute stroke. However, there is no evidence of acute intracranial abnormality in the brain, suggesting that the patient's symptoms may be related to a pre-existing vascular condition rather than an acute event." }[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.428117][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA,NONE]]
+The report does not indicate any significant stenosis involving the proximal circle of Willis.
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.428895][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+{Reasonable MRA criteria applied to assess cerebral artery narrowing.}
+
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.429367][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,NONE ]]
+There is occlusion of the right MCA distal M1 segment.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.429925][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA,NONE]]
+There is no evidence of acute large vessel occlusion from thrombus, but calcified plaque in the distal internal carotid arteries is present.
+
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.430525][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+Labels: RMCA
+
+[[##reasoning##]]
+The CT angiogram findings indicate complete occlusion of the distal right carotid terminus and right middle cerebral artery, which is consistent with a diagnosis of acute stroke.
+
+[[##completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.431368][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+RMCA
+[[NONE]]
+No acute stroke-related vascular territory was identified.
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:57.438671][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "No acute large vessel occlusion from thrombus is evident, but calcified plaque and beam hardening artifact are present."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.452954][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "The report describes complete occlusion of the distal right carotid terminus and right middle cerebral artery, indicating a high-grade stenosis or occlusion, which is consistent with an acute stroke. However, there is no evidence of acute intracranial abnormality in the brain, suggesting that the patient's symptoms may be related to a pre-existing vascular condition rather than an acute event." }[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.454718][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA",
+  "reasoning": "The CTA report indicates no evidence of large vessel occlusion, but reduced opacification within the right MCA distribution is likely artifactual, and the patient's symptoms are consistent with a lesion in the opposite MCA territory."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.455490][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "Acute stroke suspected due to occlusion of the right MCA distal M1 segment."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.456265][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "The report includes findings of stable severe narrowing or segmental occlusion of the left M1 segment middle cerebral artery, as well as suspected high-grade stenosis of bilateral P3 segment branches, indicating a large vessel occlusion." }[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.457005][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA",
+  "reasoning": "No acute stroke-related vascular territory is identified"
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.463176][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE,RACA,LPCA ]]
+Reasoning: No large vessel occlusion detected despite clinical suspicion of right-sided stroke.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.463827][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA,LICA,RCA,LCA,NONE ]]
+Reasoning: Acute occlusion of the right MCA distal M1 segment is identified.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.464489][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE,RACA,LICA,RCA,LCA ]]
+There is no acute large vessel occlusion from thrombus.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.465282][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA,LCA,NONE ]]
+Reasoning: Acute stroke-related vascular territory is present in the left M1 segment middle cerebral artery, right A2 ACA, and bilateral P3 segment branches.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.465742][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA ]]
+The right internal carotid artery is completely occluded.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.466486][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE ]]
+Reasoning: No acute stroke-related vascular territory is identified.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.469983][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA",
+  "reasoning": "No large vessel occlusion detected, but right-sided weakness and facial droop suggest involvement of the right MCA territory."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.470986][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA",
+  "reasoning": "No acute large vessel occlusion from thrombus, but calcified plaque in distal internal carotid arteries suggests RACA."}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.472560][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "No acute occlusion or severe flow-limiting lesion was identified."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.473336][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA,LICA",
+  "reasoning": "No acute stroke-related vascular territory identified."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.474079][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "Acute occlusion of the right MCA distal M1 segment without significant collateral supply or other qualifying lesions."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.474791][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, LACA, RPCA, LPCA",
+  "reasoning": "Complete occlusion of the distal right carotid terminus and right middle cerebral artery indicates a large acute stroke-related vascular territory."}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.480593][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,NONE ]]
+There is occlusion of the right MCA distal M1 segment.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.481250][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA,NONE]]
+The report does not indicate any significant stenosis involving the proximal circle of Willis.
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.481933][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+{Reasonable MRA criteria applied to assess cerebral artery narrowing.}
+
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.482996][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA,NONE]]
+There is no evidence of acute large vessel occlusion from thrombus, but calcified plaque in the distal internal carotid arteries is present.
+
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.483594][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+Labels: RMCA
+
+[[##reasoning##]]
+The CT angiogram findings indicate complete occlusion of the distal right carotid terminus and right middle cerebral artery, which is consistent with a diagnosis of acute stroke.
+
+[[##completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.484142][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[RMCA]]
+RMCA
+[[NONE]]
+No acute stroke-related vascular territory was identified.
+[[## completed##]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.489779][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "Acute stroke suspected due to occlusion of the right MCA distal M1 segment."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.490777][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "The report describes complete occlusion of the distal right carotid terminus and right middle cerebral artery, indicating a high-grade stenosis or occlusion, which is consistent with an acute stroke. However, there is no evidence of acute intracranial abnormality in the brain, suggesting that the patient's symptoms may be related to a pre-existing vascular condition rather than an acute event." }[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.491584][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "The report includes findings of stable severe narrowing or segmental occlusion of the left M1 segment middle cerebral artery, as well as suspected high-grade stenosis of bilateral P3 segment branches, indicating a large vessel occlusion." }[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.492327][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA",
+  "reasoning": "The CTA report indicates no evidence of large vessel occlusion, but reduced opacification within the right MCA distribution is likely artifactual, and the patient's symptoms are consistent with a lesion in the opposite MCA territory."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.493087][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "No acute large vessel occlusion from thrombus is evident, but calcified plaque and beam hardening artifact are present."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.493801][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        Prompt a Language Model to label acute stroke-related vascular territory from CTA report text by utilizing CT angiography data processed with artificial intelligence software, incorporating MIP multiplanar and 3D reconstructed images, and providing detailed descriptions of findings in cerebral arteries.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA",
+  "reasoning": "No acute stroke-related vascular territory is identified"
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.500269][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA,LICA,RCA,LCA,NONE ]]
+Reasoning: Acute occlusion of the right MCA distal M1 segment is identified.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.501022][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE,RACA,LPCA ]]
+Reasoning: No large vessel occlusion detected despite clinical suspicion of right-sided stroke.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.501950][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE,RACA,LICA,RCA,LCA ]]
+There is no acute large vessel occlusion from thrombus.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.502567][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA,LCA,NONE ]]
+Reasoning: Acute stroke-related vascular territory is present in the left M1 segment middle cerebral artery, right A2 ACA, and bilateral P3 segment branches.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.503209][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ RMCA,LACA,RPCA,LICA,RICA ]]
+The right internal carotid artery is completely occluded.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.504067][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## report_text ## ]]
+{report_text}
+
+[[ ## labels ## ]]
+{labels}
+
+[[ ## reasoning ## ]]
+{reasoning}
+
+[[ ## completed ## ]]
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with the corresponding output fields, starting with the field `[[ ## labels ## ]]`, then `[[ ## reasoning ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+[31mResponse:[0m
+
+[32m[[ NONE ]]
+Reasoning: No acute stroke-related vascular territory is identified.
+[[ ## completed ## ]][0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.507189][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  None TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. MIP multiplanar and 3D reconstructed images were performed on a separate workstation. CT imaging was performed with iterative reconstruction techniques and/or automated exposure control to reduce radiation dose. FINDINGS: There is occlusion of the right MCA distal M1 segment. There is a paucity of distal collateral branches. There is mild to moderate stenosis of the left PCA P1/P2 segment. No proximal branch occlusion or high grade stenosis of the branches of the circle of Willis, ICAs, or vertebrobasilar system is seen. No aneurysm or vascular malformation is identified. The major dural venous sinuses opacify normally. IMPRESSION: Occlusion of the right MCA distal M1 segment. A preliminary report was provided to Dr. McClelland of the ER at 13:50 hours. 1RM1RAD_PS46
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "Acute occlusion of the right MCA distal M1 segment without significant collateral supply or other qualifying lesions."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.508366][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Right-sided weakness and facial droop. COMPARISON:  Concurrent CT head. TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex with contrast during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was  performed with iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regard to the diagnosis  of a large vessel occlusion. FINDINGS:  RAPID analysis detects reduced opacification within the right MCA distribution. This is favored to be artifactual. No evidence of large vessel occlusion is identified. Per chart review, patient has right-sided weakness and facial droop which would  localize to the opposite MCA territory. Internal carotid arteries and proximal branches: Right: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Left: Mild stenoses of the siphon. Proximal ACA and MCA are patent. Vertebral arteries: Calcifications without flow-limiting stenosis. Basilar artery: Patent. Posterior cerebral arteries: Patent. A-Comm: Visualized. P-Comm: Visualized bilaterally. Limited evaluation of the venous sinuses demonstrates no evidence of thrombosis.  IMPRESSION:  No evidence of significant stenosis involving the proximal circle of Willis. 1WT1RAD_PS02
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA",
+  "reasoning": "No large vessel occlusion detected, but right-sided weakness and facial droop suggest involvement of the right MCA territory."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.509638][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected. Evaluate for acute large vessel occlusion from thrombus.    COMPARISON:  CT brain from earlier today. CT angiogram of the head from March 7, 2016.    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT scans are performed using  radiation dose reduction techniques. Technical factors are evaluated and adjusted to ensure appropriate moderation of exposure. Automated dose management technology is applied to adjust radiation exposure while achieving a diagnostic quality image.      FINDINGS:    There is no definite evidence of acute large vessel occlusion from thrombosis at the level of the circle of Willis. There is dense calcified plaque in the wall of the distal internal carotid arteries with beam hardening artifact obscuring some details.  There could be moderate stenosis in both genu and there are mild areas of narrowing in other regions.    There is enhancement in the dural venous sinuses. The study is not performed for proper imaging of the brain.    IMPRESSION:    No significant changes.    No definite evidence of acute large vessel occlusion from thrombus.    There calcified plaque in the distal internal carotid arteries with beam hardening artifact obscure details.            HMSL-MXL0302325
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA",
+  "reasoning": "No acute large vessel occlusion from thrombus, but calcified plaque in distal internal carotid arteries suggests RACA."}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.510420][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CTA STROKE HEAD W WO CONTRAST CLINICAL HISTORY: Neuro deficit  acute  stroke suspected COMPARISON:  MRA head 7/28/2025 TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose. CT angiography data was processed using artificial intelligence software to assist stroke clinical decision making with regards to the diagnosis of large  vessel occlusion.  FINDINGS: Stable severe narrowing or segmental occlusion of the origin and mid portions of the left M1 segment middle cerebral artery. Minimal arteriosclerosis of the distal M1 segment right middle cerebral artery without significant narrowing. Mild irregular  narrowing of distal left M2/proximal M3 branches with arteriosclerosis.  Occlusion of the right A2 ACA. Mild arteriosclerosis of portions of the cavernous and paraclinoid internal carotid arteries with up to mild narrowing.  Arteriosclerosis of the V4 segment vertebral arteries without significant narrowing. Ectasia of the vertebrobasilar junction.  Arteriosclerosis of the basilar artery without significant narrowing.  Infundibulum at origin of the right posterior cerebral artery with subsequent focal moderate severe stenosis. Severe narrowing of the mid P2 segment left posterior cerebral artery. Moderate to severe narrowing of the mid P2 segment right posterior  cerebral artery and suspected high-grade stenosis of bilateral P3 segment branches.  IMPRESSION:  Stable exam compared with 7/28/2025. 8MN1IMG_PS103
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, NONE",
+  "reasoning": "No acute occlusion or severe flow-limiting lesion was identified."
+}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.511161][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+EXAMINATION: CT ANGIOGRAM HEAD W WO CONTRAST   CLINICAL HISTORY: Neuro deficit  acute  stroke suspected    COMPARISON:  CT from the same date    TECHNIQUE:  Imaging of the intracranial circulation was obtained from the skull base to the vertex during the arterial phase of enhancement. Postprocessing was performed with MIP multiplanar and 3D reconstructed images.  CT imaging was performed with  iterative reconstruction technique and/or automated exposure control to reduce radiation dose.      FINDINGS:    Atherosclerosis involving carotid terminus associated with moderate stenosis in the right cavernous segment. There is complete occlusion of the paraclinoid segment of the intracranial right internal carotid artery right and right middle cerebral artery.  Right A1 is hypoplastic or occluded. Right A2 arises from the opposite side. No focal stenosis or aneurysm of the left intracranial internal carotid arteries, left middle cerebral arteries, or  anterior cerebral arteries.    No focal stenosis or aneurysm of the vertebral, basilar, or posterior cerebral arteries. Fetal origin of right PCA.    Limited evaluation of the venous sinuses limited due to contrast timing.    Limited examination of the brain demonstrates no evidence of acute intracranial abnormality.    IMPRESSION:    Compleat occlusion of the distal right carotid terminus and right middle cerebral artery.        Findings were discussed with Dr. Gottiparthy at 2/16/2022 12:38 AM who verbalized understanding.    1M2RAD_PS03
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "RMCA, LACA, RPCA, LPCA",
+  "reasoning": "Complete occlusion of the distal right carotid terminus and right middle cerebral artery indicates a large acute stroke-related vascular territory."}[0m
+
+
+
+
+
+[34m[2026-06-17T13:24:59.511916][0m
+
+[31mSystem message:[0m
+
+Your input fields are:
+1. `report_text` (str): CTA report text.
+Your output fields are:
+1. `labels` (str): Only comma-separated labels from the allowed list. Example: RMCA or NONE.
+2. `reasoning` (str): Exactly one short sentence. No step-by-step reasoning.
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+Inputs will have the following structure:
+
+[[ ## report_text ## ]]
+{report_text}
+
+Outputs will be a JSON object with the following fields.
+
+{
+  "labels": "{labels}",
+  "reasoning": "{reasoning}"
+}
+In adhering to this structure, your objective is: 
+        /no_think
+        Do not think step by step. Return only the final answer fields.
+        
+        Your goal is to label acute stroke-related vascular territory from CTA report text.
+        
+        Allowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.
+        
+        CTA-specific rules:
+        - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+        - Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+          supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+        - Use RCA/LCA only for common carotid or cervical carotid involvement.
+        - Do not use RCA/LCA for carotid terminus.
+        - Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+        - Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+        - Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+          unless your project rules say they qualify.
+        
+        Output rules:
+        - Do not explain step by step.
+        - Do not write hidden analysis.
+        - Reasoning must be exactly one short sentence.
+        - Labels must be only comma-separated allowed labels.
+        - End immediately after the labels.
+
+
+[31mUser message:[0m
+
+[[ ## report_text ## ]]
+Exams: Intracranial CT angiogram History: Stroke suspected  Comparison studies: Same day CT head.    Technique:  Axial images were obtained through the head region during the injection of intravenous contrast. Multiplanar, maximum intensity projection (MIP), and volume rendered reconstructions were created on the 3-D workstation.  Automated exposure control for dose reduction.    IV Contrast yes  Complication: None      FINDINGS:    Head CT with contrast:  No interval changes when compared to the previous CT.  No enhancing abnormalities.    CTA circle of Willis:    Carotid arteries:  Patent ICAs, A1 and M1 segments, without significant stenosis..    Vertebrobasilar Circulation:  Vertebral arteries: Patent, no stenosis..  Basilar artery: Patent, no stenosis.  Posterior cerebral arteries:  Patent, no stenosis.      IMPRESSION:    Patent circle of Willis without significant stenosis or vascular malformation
+
+Respond with a JSON object in the following order of fields: `labels`, then `reasoning`.
+
+
+[31mResponse:[0m
+
+[32m{
+  "labels": "NONE,RACA,LICA",
+  "reasoning": "No acute stroke-related vascular territory identified."
+}[0m
+
+
+
+
+
