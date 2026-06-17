@@ -185,9 +185,9 @@ DSPY_INPUT_DESCRIPTIONS = {
 }
 
 DSPY_OUTPUT_DESCRIPTIONS = {
-    "labels": "Comma-separated final labels using only ALLOWED_LABELS.",
-    "reasoning": "Brief explanation supporting the final labels.",
-    "combined_reasoning": "Brief explanation for the final combined labels.",
+    "labels": "Only comma-separated labels from the allowed list. Example: RMCA or NONE.",
+    "reasoning": "Exactly one short sentence. No step-by-step reasoning.",
+    "combined_reasoning": "Exactly one short sentence explaining the final combined labels.",
 }
 
 _ALLOWED_LABELS_TEXT = ", ".join(ALLOWED_LABELS)

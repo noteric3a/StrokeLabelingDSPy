@@ -349,11 +349,10 @@ class CTLabeler(dspy.Module):
 class CTALabeler(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(CTAStrokeSignature)
+        self.predict = dspy.Predict(CTAStrokeSignature)
 
     def forward(self, report_text: str):
         return self.predict(report_text=report_text)
-
 
 class CTPLabeler(dspy.Module):
     def __init__(self):
