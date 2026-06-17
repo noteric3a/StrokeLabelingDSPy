@@ -1,227 +1,126 @@
-from __future__ import annotations
+"""
+Main labeling workflow with pipelined case processing.
+
+Pipeline behavior:
+1. Run CT/CTA/CTP for a case in parallel.
+2. Start that case's Combined step only after CT/CTA/CTP labels exist.
+3. While that Combined step is running, start CT/CTA/CTP for the next case.
+"""
+
 import asyncio
 import json
-import re
-from collections import Counter
-from datetime import datetime
-from contextlib import asynccontextmanager
-from typing import Any, Callable, Dict, List, Tuple
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+
+from config import MODEL_NAME, MAX_CONCURRENT_REQUESTS
 import config as cfg
-from tqdm import tqdm
-
-from dspy_programs import (
-    StrokePrediction,
-    initialize_dspy_programs,
-    label_ct,
-    label_cta,
-    label_ctp,
-    label_combined,
+from cache import ProcessingCache
+from ollama_client import ollama_generate_async
+from prompts import (
+    build_ct_prompt,
+    build_cta_prompt,
+    build_ctp_prompt,
+    build_combined_prompt,
+    build_ct_sanitization_prompt,
 )
-
+from schemas import SINGLE_MODALITY_SCHEMA, COMBINED_SCHEMA, CT_SANITIZATION_SCHEMA
+from utils import clean_report, normalize_labels
 from review_checks import add_review_flags
-from schemas import CT_SANITIZATION_SCHEMA
-from ollama_client import ollama_generate_sync
+from confidence import confidence_checking_enabled, confidence_temperature, confidence_run_count, confidence_fields_for_result, summarize_label_votes
 
 
-# =============================================================================
-# Optional semaphore helper
-# =============================================================================
+EMPTY_REASONING_FIELDS = {
+    "CT_GT_reasoning": "",
+    "CTA_GT_reasoning": "",
+    "CTP_GT_reasoning": "",
+    "CT_Combined_GT_reasoning": "",
+    "CT_Original_GT_reasoning": "",
+    "CT_Sanitization_reasoning": "",
+}
 
-@asynccontextmanager
-async def optional_semaphore(semaphore):
+# Top-level fields that should be omitted from the final output JSON when
+# INCLUDE_REASONING_IN_JSON is False or --no-reasoning is used.
+REASONING_JSON_FIELDS = set(EMPTY_REASONING_FIELDS) | {"reasoning"}
+
+
+def _resolve_include_reasoning(include_reasoning: Optional[bool] = None) -> bool:
+    """Return the effective reasoning-output setting.
+
+    A function argument overrides config.py. If no argument is supplied, use
+    config.INCLUDE_REASONING_IN_JSON, defaulting to True for backward
+    compatibility with older config.py files.
     """
-    Use a semaphore if one is provided.
-
-    Why this exists:
-        You may want to limit how many reports run at the same time.
-
-    Example:
-        If max_concurrent = 4, only 4 case-labeling tasks run at once.
-
-    If semaphore is None:
-        This context manager does nothing.
-    """
-
-    if semaphore is None:
-        yield
-    else:
-        async with semaphore:
-            yield
+    if include_reasoning is None:
+        return bool(getattr(cfg, "INCLUDE_REASONING_IN_JSON", True))
+    return bool(include_reasoning)
 
 
-# =============================================================================
-# Confidence helpers
-# =============================================================================
-
-def _label_key(labels: List[str]) -> Tuple[str, ...]:
-    """
-    Convert a label list into a hashable sorted tuple.
-
-    Counter needs hashable keys.
-
-    Example:
-        ["LMCA", "RMCA"] -> ("LMCA", "RMCA")
-        ["RMCA", "LMCA"] -> ("LMCA", "RMCA")
-
-    Sorting prevents the same label set from being counted separately just
-    because the model returned the labels in a different order.
-    """
-
-    return tuple(sorted(str(label).strip().upper() for label in labels))
-
-
-def _union_reasoning(final_key: Tuple[str, ...], attempts: List[StrokePrediction]) -> str:
-    """
-    Build final reasoning from repeated attempts.
-
-    Your earlier pipeline wanted the final reasoning to be a union of the
-    repeated runs in confidence mode.
-
-    This function:
-        1. Keeps reasoning from attempts that voted for the winning label.
-        2. Adds alternate-label reasoning samples below a marker.
-        3. Uses the exact marker your review checker knows how to ignore:
-
-              Alternate-label reasoning samples:
-
-    Why that marker matters:
-        Your checker strips alternate-label reasoning before doing consistency
-        checks so alternate votes do not accidentally trigger false flags.
-    """
-
-    winning_reasonings: List[str] = []
-    alternate_reasonings: List[str] = []
-
-    for result in attempts:
-        current_key = _label_key(result.labels)
-        text = result.reasoning.strip()
-
-        if not text:
-            continue
-
-        if current_key == final_key:
-            # Avoid repeating identical reasoning.
-            if text not in winning_reasonings:
-                winning_reasonings.append(text)
-        else:
-            # Keep a few alternate examples for debugging.
-            alternate_text = f"Labels {list(current_key)}: {text}"
-            if alternate_text not in alternate_reasonings:
-                alternate_reasonings.append(alternate_text)
-
-    # Keep only the first few reasoning samples so the spreadsheet does not
-    # become enormous.
-    final_text = "\n".join(f"- {r}" for r in winning_reasonings[:cfg.CONFIDENCE_REASONING_WINNING_LIMIT])
-
-    if not final_text:
-        final_text = "Winning label selected by repeated DSPy runs, but no reasoning was returned."
-
-    if alternate_reasonings:
-        final_text += "\n\nAlternate-label reasoning samples:\n"
-        final_text += "\n".join(f"- {r}" for r in alternate_reasonings[:cfg.CONFIDENCE_REASONING_ALTERNATE_LIMIT])
-
-    return final_text
-
-
-async def run_prediction_with_confidence(
-    sync_predict_fn: Callable[[], StrokePrediction],
-) -> Dict[str, Any]:
-    """
-    Run a DSPy prediction once or multiple times.
-
-    Args:
-        sync_predict_fn:
-            A normal synchronous function that returns StrokePrediction.
-
-    Returns:
-        A dictionary containing:
-            labels
-            reasoning
-            is_confident
-            confidence_percentage
-            possible_answers
-
-    Why asyncio.to_thread() is used:
-        DSPy calls are synchronous/blocking. Wrapping them in asyncio.to_thread()
-        lets the rest of your async pipeline keep working.
-    """
-
-    # Simple mode:
-    # Run once and return 100% confidence.
-    if not cfg.ENABLE_CONFIDENCE_CHECKING:
-        result = await asyncio.to_thread(sync_predict_fn)
-
-        return {
-            "labels": result.labels,
-            "reasoning": result.reasoning,
-            "is_confident": True,
-            "confidence_percentage": 100.0,
-            "possible_answers": [(result.labels, 100.0)],
-        }
-
-    # Confidence mode:
-    # Run the same prediction multiple times.
-    attempts: List[StrokePrediction] = []
-
-    for _ in range(cfg.CONFIDENCE_ATTEMPTS):
-        result = await asyncio.to_thread(sync_predict_fn)
-        attempts.append(result)
-
-    # Count each unique label set.
-    counts = Counter(_label_key(result.labels) for result in attempts)
-
-    # Pick the most common label set.
-    final_key, final_count = counts.most_common(1)[0]
-
-    # Compute vote percentage.
-    confidence_percentage = final_count / len(attempts) * 100
-
-    # Apply your threshold.
-    is_confident = confidence_percentage >= cfg.CONFIDENCE_THRESHOLD_PERCENTAGE
-
-    # Store all possible answers for debugging.
-    possible_answers = [
-        (list(key), count / len(attempts) * 100)
-        for key, count in counts.most_common()
-    ]
-
+def strip_reasoning_fields(case: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of one labeled case without reasoning text fields."""
     return {
-        "labels": list(final_key),
-        "reasoning": _union_reasoning(final_key, attempts),
-        "is_confident": is_confident,
-        "confidence_percentage": confidence_percentage,
-        "possible_answers": possible_answers,
+        key: value
+        for key, value in case.items()
+        if key not in REASONING_JSON_FIELDS
     }
 
 
-def _apply_result(case: Dict[str, Any], prefix: str, result: Dict[str, Any]) -> None:
+def prepare_case_for_json(
+    case: Dict[str, Any],
+    include_reasoning: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Return one case in the form that should be written to output JSON."""
+    case_with_review_flags = add_review_flags(case)
+    if _resolve_include_reasoning(include_reasoning):
+        return dict(case_with_review_flags)
+    return strip_reasoning_fields(case_with_review_flags)
+
+
+def prepare_cases_for_json(
+    labeled_cases: List[Dict[str, Any]],
+    include_reasoning: Optional[bool] = None,
+) -> List[Dict[str, Any]]:
+    """Return all cases in the form that should be written to output JSON."""
+    return [prepare_case_for_json(case, include_reasoning) for case in labeled_cases]
+
+
+def failed_case(case_id: str, error: Exception | str) -> Dict[str, Any]:
+    """Return a safe output row when a case cannot be fully processed."""
+    case = {
+        "case_id": case_id,
+        "CT_GT": ["NONE"],
+        "CTA_GT": ["NONE"],
+        "CTP_GT": ["NONE"],
+        "Combined_GT": ["NONE"],
+        "New_CT_Report": "",
+        "CT_Report_Was_Sanitized": False,
+        "CT_Original_GT": ["NONE"],
+        **EMPTY_REASONING_FIELDS,
+        "reasoning": f"FAILED: {repr(error)}",
+    }
+    case = add_review_flags(case)
+    case["Needs_Review"] = True
+    case["Review_Flags"] = [f"Case failed during processing: {repr(error)}"] + case.get("Review_Flags", [])
+    case["Review_Flag_Count"] = len(case["Review_Flags"])
+    return case
+
+
+def save_progress(
+    output_file: str,
+    labeled_cases: List[Dict[str, Any]],
+    include_reasoning: Optional[bool] = None,
+) -> None:
+    """Save accumulated cases after each completed final case.
+
+    The in-memory cases and debug logs can still keep reasoning. This controls
+    only what is written to the final output JSON.
     """
-    Write a modality result into the case dictionary.
+    output_cases = prepare_cases_for_json(labeled_cases, include_reasoning)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(output_cases, f, indent=2)
 
-    Example:
-        prefix = "CT_GT"
-
-    Writes:
-        case["CT_GT"]
-        case["CT_GT_reasoning"]
-        case["CT_GT_is_confident"]
-        case["CT_GT_confidence_percentage"]
-        case["CT_GT_possible_answers"]
-
-    This keeps the output format close to your manual pipeline.
-    """
-
-    case[prefix] = result["labels"]
-    case[f"{prefix}_reasoning"] = result["reasoning"]
-    case[f"{prefix}_is_confident"] = result["is_confident"]
-    case[f"{prefix}_confidence_percentage"] = result["confidence_percentage"]
-    case[f"{prefix}_possible_answers"] = result["possible_answers"]
-
-
-
-# =============================================================================
-# CT sanitization helpers
-# =============================================================================
 
 CT_CONTAMINATION_KEYWORDS = (
     "cta",
@@ -250,16 +149,6 @@ CT_CONTAMINATION_KEYWORDS = (
     "brain at risk",
     "rapid",
 )
-
-
-def clean_report_text(value: Any) -> str:
-    """Convert None/NaN-like values into safe report text."""
-    if value is None:
-        return ""
-    text = str(value).strip()
-    if text.lower() in {"nan", "none", "null"}:
-        return ""
-    return text
 
 
 def ct_report_may_contain_cta_ctp(report: str) -> bool:
@@ -311,7 +200,7 @@ def safe_ct_sanitization_result(
             "reasoning": "Malformed CT sanitization result. Original CT report was used.",
         }
 
-    sanitized_report = clean_report_text(result.get("sanitized_report", ""))
+    sanitized_report = clean_report(result.get("sanitized_report", ""))
     if not sanitized_report:
         sanitized_report = original_ct_report
 
@@ -324,337 +213,721 @@ def safe_ct_sanitization_result(
         "contamination_found": _boolish(result.get("contamination_found", False)),
         "sanitized_report": sanitized_report,
         "removed_sections": [str(item) for item in removed_sections],
-        "reasoning": clean_report_text(result.get("reasoning", "")),
+        "reasoning": clean_report(result.get("reasoning", "")),
     }
 
 
-def build_ct_sanitization_prompt(case_id: str, ct_report: str) -> str:
-    """Build the same CT sanitization prompt used in the earlier non-DSPy pipeline."""
-    return f"""
-You are cleaning a report that is supposed to be ONLY a non-contrast CT head/brain report.
 
-Your job:
-1. Detect whether the supplied CT report contains CTA/CT angiogram or CTP/perfusion findings mixed into it.
-2. If contamination is present, remove ONLY the CTA/CTP/perfusion/angiographic findings and return a sanitized CT-only report.
-3. If no contamination is present, return the original CT report exactly as the sanitized_report.
-
-What counts as CTA/CTP contamination:
-- Sentences or sections labeled CTA, CT ANGIOGRAM, CT angiography, angiographic, arterial phase, vessel postprocessing, MIP, 3D reconstruction, circle of Willis vessel evaluation, head/neck vessel evaluation.
-- Vessel-only CTA findings such as occlusion, stenosis, thrombus, filling defect, flow cutoff, absent opacification, reconstitution, collateral flow, or delayed filling when they are clearly from CTA/angiography rather than a noncontrast CT hyperdense vessel sign.
-- CT perfusion findings such as CTP, perfusion, Tmax, CBF, CBV, MTT, mismatch, core volume, hypoperfusion volume, penumbra, tissue at risk, RAPID, or perfusion maps.
-- Impressions/recommendations that summarize CTA/CTP findings rather than CT findings.
-
-What must be preserved:
-- Noncontrast CT-visible findings, including hemorrhage, mass effect, midline shift, edema, hypodensity, loss of gray-white differentiation, ASPECTS, hyperdense MCA/vessel sign, infarct seen on CT, chronic infarcts, encephalomalacia, lacunar infarcts, atrophy, microvascular disease, hydrocephalus, and postoperative CT findings.
-- CT report structure when possible: EXAMINATION, COMPARISON, TECHNIQUE, FINDINGS, IMPRESSION.
-- Do not change wording of preserved CT-only findings except for minimal cleanup needed after removing contaminated sentences.
-- Do not add new medical facts.
-
-Important edge cases:
-- Keep a noncontrast CT phrase like "hyperdense left MCA sign" because that is CT-visible.
-- Remove a CTA phrase like "left M1 occlusion on CTA" because that is angiographic.
-- Remove CTP values like "Tmax >6 seconds", "CBF <30%", "mismatch volume", or "hypoperfusion".
-- If the entire supplied text is actually CTA/CTP and no CT-only findings remain, set sanitized_report to "No noncontrast CT-only findings are provided in the supplied report."
-
-Before returning the sanitized CT report, scan it for CTA/CTP modality terms.
-The final New_CT_Report must not contain:
-CTA, CT angiogram, CT angiography, CTP, CT perfusion, perfusion, Tmax, CBF, CBV, mismatch, hypoperfusion, penumbra, infarct core, tissue at risk.
-
-If a sentence contains both a CT-visible finding and CTA/CTP wording, preserve only the CT-visible finding and remove the CTA/CTP wording.
-Example:
-"There is hyperdensity in the right MCA compatible with subtotal occlusion seen on the CT angiogram"
-should become:
-"There is hyperdensity in the right MCA compatible with thrombus."
-
-Case ID:
-{case_id}
-
-Original CT Report:
-{ct_report}
-
-Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "contamination_found": true,
-  "sanitized_report": "CT-only report text after removing CTA/CTP contamination, or the original report if no contamination was found",
-  "removed_sections": ["short description or exact removed CTA/CTP sentence"],
-  "reasoning": "Brief explanation of what was removed or why no removal was needed"
-}}
-""".strip()
+COMBINED_FALLBACK_LABEL_ORDER = [
+    "NONE",
+    "RMCA", "LMCA",
+    "RACA", "LACA",
+    "RPCA", "LPCA",
+    "RPICA", "LPICA",
+    "BA",
+    "RVA", "LVA",
+    "RICA", "LICA",
+]
 
 
-def _json_from_text(text: str) -> Dict[str, Any] | None:
-    """Extract a JSON object from model text."""
-    if not text:
-        return None
-    text = str(text).strip()
-    try:
-        parsed = json.loads(text)
-        if isinstance(parsed, dict):
-            return parsed
-    except Exception:
-        pass
-    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if match:
-        try:
-            parsed = json.loads(match.group(0))
-            if isinstance(parsed, dict):
-                return parsed
-        except Exception:
-            pass
-    return None
+def _combined_positive_fallback_enabled() -> bool:
+    """Return whether code should prevent Combined_GT from erasing positive modality labels."""
+    return bool(getattr(cfg, "ENFORCE_COMBINED_POSITIVE_FALLBACK", True))
 
 
-def sanitize_ct_report_sync(case_id: str, ct_report: str) -> Dict[str, Any]:
-    """Run the CT sanitizer through direct Ollama structured output."""
-    raw = ollama_generate_sync(
-        prompt=build_ct_sanitization_prompt(case_id, ct_report),
-        schema=CT_SANITIZATION_SCHEMA,
-        case_id=case_id,
-        tag="CT_Sanitize",
-        temperature=cfg.DSPY_TEMPERATURE,
+def _sort_labels_for_combined(labels: List[str]) -> List[str]:
+    order = {label: index for index, label in enumerate(COMBINED_FALLBACK_LABEL_ORDER)}
+    unique: List[str] = []
+    for label in labels:
+        label = str(label).strip().upper()
+        if label and label not in unique:
+            unique.append(label)
+    return sorted(unique, key=lambda label: order.get(label, 999))
+
+
+def _positive_modality_label_union(partial_case: Dict[str, Any]) -> List[str]:
+    """Return the union of non-NONE CT/CTA/CTP labels in stable label order."""
+    labels: List[str] = []
+    for field in ("CT_GT", "CTA_GT", "CTP_GT"):
+        for label in normalize_labels(partial_case.get(field, ["NONE"])):
+            if label != "NONE" and label not in labels:
+                labels.append(label)
+    labels = _sort_labels_for_combined(labels)
+    return labels if labels else ["NONE"]
+
+
+def apply_combined_none_positive_fallback(
+    combined_result: Dict[str, Any],
+    partial_case: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Prevent Combined_GT from becoming NONE while modality labels are positive.
+
+    The Combined prompt can still remove chronic/artifact/upstream labels, but in
+    practice the model sometimes returns ["NONE"] even when CT_GT, CTA_GT, or
+    CTP_GT has a concrete territory. This deterministic guard preserves the
+    union of positive modality labels and records the model's original Combined
+    output for review.
+    """
+    if not _combined_positive_fallback_enabled():
+        return combined_result
+
+    final_labels = normalize_labels(combined_result.get("Combined_GT"))
+    positive_union = _positive_modality_label_union(partial_case)
+    if final_labels != ["NONE"] or positive_union == ["NONE"]:
+        return combined_result
+
+    original_reasoning = str(combined_result.get("reasoning", "")).strip()
+    fixed_result = dict(combined_result)
+    fixed_result["Combined_GT_original_before_none_override"] = final_labels
+    fixed_result["Combined_GT_none_overridden_from_modalities"] = True
+    fixed_result["Combined_GT"] = positive_union
+    fixed_result["reasoning"] = (
+        "Code safety override: the Combined step returned NONE even though "
+        "at least one modality label was positive. Combined_GT was set to the "
+        f"union of positive CT/CTA/CTP labels: {positive_union}. "
+        "Review this case if the positive modality label was chronic, artifact, "
+        "or otherwise non-qualifying.\n\n"
+        "Original Combined reasoning before override:\n"
+        f"{original_reasoning or 'No Combined reasoning was returned.'}"
     )
-    parsed = _json_from_text(raw)
-    if parsed is None:
-        raise RuntimeError(f"CT sanitizer returned invalid JSON: {raw[:300]!r}")
-    return parsed
+
+    summary = fixed_result.get("_confidence_summary")
+    if isinstance(summary, dict):
+        fixed_summary = dict(summary)
+        fixed_summary["model_final_label_before_none_override"] = summary.get("final_label", final_labels)
+        fixed_summary["final_label"] = positive_union
+        fixed_result["_confidence_summary"] = fixed_summary
+
+    return fixed_result
 
 
-async def sanitize_ct_report_for_case(case_id: str, ct_report: str, semaphore=None) -> Dict[str, Any]:
-    """Async wrapper around the synchronous sanitizer."""
-    async with optional_semaphore(semaphore):
-        return await asyncio.to_thread(sanitize_ct_report_sync, case_id, ct_report)
+async def generate_label_with_optional_confidence(
+    prompt: str,
+    schema: Dict[str, Any],
+    case_id: str,
+    tag: str,
+    semaphore: asyncio.Semaphore,
+    model: str,
+    *,
+    label_field: str = "labels",
+) -> Dict[str, Any]:
+    """Run one label prompt normally, or run repeated confidence samples.
 
+    Normal mode does one deterministic call at temperature 0.
 
-# =============================================================================
-# Individual modality labeling functions
-# =============================================================================
-
-async def label_ct_for_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any]:
+    Confidence mode does CONFIDENCE_RUNS calls at CONFIDENCE_TEMPERATURE. The
+    most common label set becomes the final label. Vote percentages are stored
+    in _confidence_summary and later copied into JSON fields.
     """
-    Label the CT report for one case with the restored sanitization behavior.
-
-    Controlled behavior from the earlier pipeline:
-        1. Label the original CT report normally and keep it as CT_Original_GT.
-        2. If the CT report contains CTA/CTP/perfusion keywords, run the CT sanitizer.
-        3. If the sanitizer actually changed the report, rerun CT on New_CT_Report
-           and use that result as CT_GT.
-    """
-
-    case_id = str(case.get("case_id", "unknown"))
-    original_report = clean_report_text(case.get("CT_Report") or "")
-
-    async with optional_semaphore(semaphore):
-        original_result = await run_prediction_with_confidence(
-            lambda: label_ct(original_report)
+    if not confidence_checking_enabled():
+        return await ollama_generate_async(
+            prompt,
+            schema,
+            case_id,
+            tag,
+            semaphore,
+            model,
+            temperature=0,
         )
 
-    _apply_result(case, "CT_Original_GT", original_result)
+    runs = confidence_run_count()
+    temp = confidence_temperature()
+    print(f"Running {tag} confidence sampling for case {case_id}: {runs} runs at temperature {temp}")
 
-    if ct_report_may_contain_cta_ctp(original_report):
-        try:
-            raw_sanitization_result = await sanitize_ct_report_for_case(
-                case_id,
-                original_report,
-                semaphore,
-            )
-        except Exception as exc:
-            raw_sanitization_result = exc
+    tasks = [
+        ollama_generate_async(
+            prompt,
+            schema,
+            case_id,
+            f"{tag}_conf_{i + 1:02d}",
+            semaphore,
+            model,
+            temperature=temp,
+        )
+        for i in range(runs)
+    ]
+    sampled_results = await asyncio.gather(*tasks, return_exceptions=True)
+    summary = summarize_label_votes(sampled_results, label_field=label_field)
+
+    final_result = dict(summary.get("winning_result", {}))
+    if label_field == "Combined_GT":
+        final_result["Combined_GT"] = summary["final_label"]
+    else:
+        final_result["labels"] = summary["final_label"]
+
+    final_result["reasoning"] = summary.get("winning_reasoning", final_result.get("reasoning", ""))
+    final_result["_confidence_summary"] = summary
+    return final_result
+
+
+def add_confidence_fields_to_case(
+    case: Dict[str, Any],
+    prefix: str,
+    result: Dict[str, Any],
+) -> None:
+    """Copy confidence summary fields from an LLM result into a case dict."""
+    case.update(confidence_fields_for_result(prefix, result))
+
+
+
+async def label_modalities_for_case(
+    row: pd.Series,
+    semaphore: asyncio.Semaphore,
+    model: str = MODEL_NAME,
+) -> Dict[str, Any]:
+    """
+    Run CT, CTA, and CTP for one case.
+
+    CT safety behavior:
+    1. Run the original CT label normally.
+    2. If the CT report looks like it may contain CTA/CTP/perfusion text,
+       ask the LLM to create a sanitized CT-only report.
+    3. If contamination was found and the report changed, re-run CT labeling
+       on the sanitized report and use that as CT_GT.
+    """
+    time_start = time.perf_counter()
+    case_id = str(row["Case Name"])
+
+    ct_report = clean_report(row.get("CT", ""))
+    cta_report = clean_report(row.get("CTA", ""))
+    ctp_report = clean_report(row.get("CTP", ""))
+    mri_report = clean_report(row.get("MRI", ""))
+
+    ct_task = generate_label_with_optional_confidence(
+        build_ct_prompt(case_id, ct_report),
+        SINGLE_MODALITY_SCHEMA,
+        case_id,
+        "CT",
+        semaphore,
+        model,
+        label_field="labels",
+    )
+    cta_task = generate_label_with_optional_confidence(
+        build_cta_prompt(case_id, cta_report),
+        SINGLE_MODALITY_SCHEMA,
+        case_id,
+        "CTA",
+        semaphore,
+        model,
+        label_field="labels",
+    )
+    ctp_task = generate_label_with_optional_confidence(
+        build_ctp_prompt(case_id, ctp_report),
+        SINGLE_MODALITY_SCHEMA,
+        case_id,
+        "CTP",
+        semaphore,
+        model,
+        label_field="labels",
+    )
+
+    sanitizer_task = None
+    if ct_report_may_contain_cta_ctp(ct_report):
+        sanitizer_task = ollama_generate_async(
+            build_ct_sanitization_prompt(case_id, ct_report),
+            CT_SANITIZATION_SCHEMA,
+            case_id,
+            "CT_Sanitize",
+            semaphore,
+            model,
+        )
+
+    if sanitizer_task is not None:
+        results = await asyncio.gather(
+            ct_task,
+            cta_task,
+            ctp_task,
+            sanitizer_task,
+            return_exceptions=True,
+        )
+        ct_result, cta_result, ctp_result, raw_sanitization_result = results
         sanitization_result = safe_ct_sanitization_result(
             raw_sanitization_result,
             case_id,
-            original_report,
+            ct_report,
         )
     else:
-        sanitization_result = default_ct_sanitization_result(case_id, original_report)
+        results = await asyncio.gather(ct_task, cta_task, ctp_task, return_exceptions=True)
+        ct_result, cta_result, ctp_result = results
+        sanitization_result = default_ct_sanitization_result(case_id, ct_report)
 
-    new_ct_report = clean_report_text(sanitization_result.get("sanitized_report", original_report))
+    # First convert exceptions into safe dicts.
+    ct_result = safe_modality_result(ct_result, "CT")
+    cta_result = safe_modality_result(cta_result, "CTA")
+    ctp_result = safe_modality_result(ctp_result, "CTP")
+
+    original_ct_result = ct_result
+    original_ct_labels = normalize_labels(ct_result.get("labels"))
+    original_ct_reasoning = ct_result.get("reasoning", "")
+    new_ct_report = sanitization_result.get("sanitized_report", ct_report)
     ct_report_was_sanitized = (
         bool(sanitization_result.get("contamination_found"))
-        and new_ct_report.strip() != original_report.strip()
+        and new_ct_report.strip() != ct_report.strip()
     )
 
-    # Keep New_CT_Report present for downstream Combined and spreadsheet review.
-    case["New_CT_Report"] = new_ct_report if ct_report_was_sanitized else original_report
-    case["CT_Report_Was_Sanitized"] = ct_report_was_sanitized
-    case["CT_Sanitization_reasoning"] = str(sanitization_result.get("reasoning", ""))
-    case["CT_Sanitization_removed_sections"] = sanitization_result.get("removed_sections", [])
-
+    # If the sanitizer actually removed CTA/CTP material, re-run CT labeling
+    # on the sanitized CT-only report and replace CT_GT with that new result.
     if ct_report_was_sanitized:
-        async with optional_semaphore(semaphore):
-            final_result = await run_prediction_with_confidence(
-                lambda: label_ct(new_ct_report)
+        try:
+            sanitized_ct_raw = await generate_label_with_optional_confidence(
+                build_ct_prompt(case_id, new_ct_report),
+                SINGLE_MODALITY_SCHEMA,
+                case_id,
+                "CT_Sanitized",
+                semaphore,
+                model,
+                label_field="labels",
             )
-    else:
-        final_result = original_result
+        except Exception as e:
+            sanitized_ct_raw = e
+        ct_result = safe_modality_result(sanitized_ct_raw, "CT")
 
-    _apply_result(case, "CT_GT", final_result)
-    return case
+    # Then normalize labels safely.
+    ct_labels = normalize_labels(ct_result.get("labels"))
+    cta_labels = normalize_labels(cta_result.get("labels"))
+    ctp_labels = normalize_labels(ctp_result.get("labels"))
 
-async def label_cta_for_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any]:
+    time_final = time.perf_counter()
+    print(f"Finished CT/CTA/CTP for case {case_id} in {round(time_final - time_start, 3)}s")
+
+    partial_case = {
+        "case_id": case_id,
+        "ct_report": ct_report,
+        "cta_report": cta_report,
+        "ctp_report": ctp_report,
+        "mri_report": mri_report,
+        "New_CT_Report": new_ct_report if ct_report_was_sanitized else None,
+        "CT_Report_Was_Sanitized": ct_report_was_sanitized,
+        "CT_Original_GT": original_ct_labels,
+        "CT_GT": ct_labels,
+        "CTA_GT": cta_labels,
+        "CTP_GT": ctp_labels,
+        "CT_Original_GT_reasoning": original_ct_reasoning,
+        "CT_GT_reasoning": ct_result.get("reasoning", ""),
+        "CTA_GT_reasoning": cta_result.get("reasoning", ""),
+        "CTP_GT_reasoning": ctp_result.get("reasoning", ""),
+        "CT_Sanitization_reasoning": sanitization_result.get("reasoning", "") if ct_report_was_sanitized else "",
+    }
+
+    # In confidence mode, the existing CT_GT/CTA_GT/CTP_GT fields remain the
+    # final labels for compatibility. These explicit fields make the vote table
+    # easy to inspect in JSON and Excel.
+    add_confidence_fields_to_case(partial_case, "CT_Original_GT", original_ct_result)
+    add_confidence_fields_to_case(partial_case, "CT_GT", ct_result)
+    add_confidence_fields_to_case(partial_case, "CTA_GT", cta_result)
+    add_confidence_fields_to_case(partial_case, "CTP_GT", ctp_result)
+
+    return partial_case
+
+
+async def label_combined_for_case(
+    partial_case: Dict[str, Any],
+    semaphore: asyncio.Semaphore,
+    model: str = MODEL_NAME,
+) -> Dict[str, Any]:
     """
-    Label the CTA report for one case.
+    Run Combined for one case.
+
+    This function is only called after CT/CTA/CTP have already been analyzed
+    and normalized for the same case.
     """
+    time_start = time.perf_counter()
+    case_id = partial_case["case_id"]
 
-    async with optional_semaphore(semaphore):
-        report = str(case.get("CTA_Report") or "")
+    combined_result = await generate_label_with_optional_confidence(
+        build_combined_prompt(
+            case_id,
+            (partial_case.get("New_CT_Report") or partial_case["ct_report"]),
+            partial_case["cta_report"],
+            partial_case["ctp_report"],
+            partial_case["mri_report"],
+            partial_case["CT_GT"],
+            partial_case["CTA_GT"],
+            partial_case["CTP_GT"],
+        ),
+        COMBINED_SCHEMA,
+        case_id,
+        "Combined",
+        semaphore,
+        model,
+        label_field="Combined_GT",
+    )
+    combined_result = apply_combined_none_positive_fallback(combined_result, partial_case)
 
-        result = await run_prediction_with_confidence(
-            lambda: label_cta(report)
+    final_case = {
+        "case_id": case_id,
+        "CT_Report": partial_case.get("ct_report", ""),
+        "CTA_Report": partial_case.get("cta_report", ""),
+        "CTP_Report": partial_case.get("ctp_report", ""),
+        "MRI_Report": partial_case.get("mri_report", ""),
+        "New_CT_Report": partial_case.get("New_CT_Report") or partial_case.get("ct_report", ""),
+        "CT_Report_Was_Sanitized": partial_case.get("CT_Report_Was_Sanitized", False),
+        "CT_Original_GT": partial_case.get("CT_Original_GT", partial_case["CT_GT"]),
+        "CT_GT": partial_case["CT_GT"],
+        "CTA_GT": partial_case["CTA_GT"],
+        "CTP_GT": partial_case["CTP_GT"],
+        "Combined_GT": normalize_labels(combined_result.get("Combined_GT")),
+        "CT_Original_GT_reasoning": partial_case.get("CT_Original_GT_reasoning", ""),
+        "CT_GT_reasoning": partial_case["CT_GT_reasoning"],
+        "CT_Sanitization_reasoning": partial_case.get("CT_Sanitization_reasoning", ""),
+        "CTA_GT_reasoning": partial_case["CTA_GT_reasoning"],
+        "CTP_GT_reasoning": partial_case["CTP_GT_reasoning"],
+        "CT_Combined_GT_reasoning": combined_result.get("reasoning", ""),
+        "Combined_GT_none_overridden_from_modalities": bool(combined_result.get("Combined_GT_none_overridden_from_modalities", False)),
+        "Combined_GT_original_before_none_override": combined_result.get("Combined_GT_original_before_none_override", []),
+    }
+
+    # Carry modality confidence fields from the partial case into the final case.
+    for key, value in partial_case.items():
+        if (
+            key.endswith("_final_label")
+            or key.endswith("_possible_answers")
+            or key.endswith("_confidence_percentage")
+            or key.endswith("_is_confident")
+            or key.endswith("_confidence_threshold")
+            or key.endswith("_confidence_vote_count")
+            or key.endswith("_confidence_total_votes")
+            or key.endswith("_confidence_failed_runs")
+        ):
+            final_case[key] = value
+
+    add_confidence_fields_to_case(final_case, "Combined_GT", combined_result)
+    final_case = add_review_flags(final_case)
+    if final_case.get("Combined_GT_none_overridden_from_modalities"):
+        final_case["Needs_Review"] = True
+        final_case["Review_Flags"] = [
+            "Combined_GT was changed from NONE to the union of positive modality labels by code fallback"
+        ] + final_case.get("Review_Flags", [])
+        final_case["Review_Flag_Count"] = len(final_case["Review_Flags"])
+
+    with open(cfg.RAW_OUTPUT_LOG, "a", encoding="utf-8") as f:
+        f.write(f"\n\n=== Case {case_id} ===\n")
+        f.write(json.dumps(final_case, indent=2))
+
+    time_final = time.perf_counter()
+    print(f"Finished Combined for case {case_id} in {round(time_final - time_start, 3)}s")
+    return final_case
+
+
+async def safe_label_modalities_for_case(
+    row: pd.Series,
+    semaphore: asyncio.Semaphore,
+    model: str,
+) -> Dict[str, Any]:
+    case_id = str(row["Case Name"])
+    try:
+        partial_case = await label_modalities_for_case(row, semaphore, model)
+        return {"ok": True, "case_id": case_id, "partial_case": partial_case}
+
+    except Exception as e:
+        print(f"ERROR while running CT/CTA/CTP for case {case_id}: {e}")
+
+        with open(cfg.FAILED_CASES_LOG, "a", encoding="utf-8") as f:
+            f.write(f"{case_id} [CT/CTA/CTP]: {repr(e)}\n")
+
+        final_case = failed_case(case_id, e)
+
+        # NEW: make failed cases visible in raw_ollama_outputs_async.txt
+        with open(cfg.RAW_OUTPUT_LOG, "a", encoding="utf-8") as f:
+            f.write(f"\n\n=== Case {case_id} ===\n")
+            f.write(json.dumps(final_case, indent=2))
+
+        return {"ok": False, "case_id": case_id, "final_case": final_case}
+
+
+async def safe_label_combined_for_case(
+    partial_case: Dict[str, Any],
+    semaphore: asyncio.Semaphore,
+    model: str,
+) -> Dict[str, Any]:
+    """Run Combined and convert failures into a structured fallback case."""
+    case_id = partial_case["case_id"]
+    try:
+        return await label_combined_for_case(partial_case, semaphore, model)
+    except Exception as e:
+        print(f"ERROR while running Combined for case {case_id}: {e}")
+        fallback_combined_labels = _positive_modality_label_union(partial_case)
+        final_case = {
+            "case_id": case_id,
+            "CT_Report": partial_case.get("ct_report", ""),
+            "CTA_Report": partial_case.get("cta_report", ""),
+            "CTP_Report": partial_case.get("ctp_report", ""),
+            "MRI_Report": partial_case.get("mri_report", ""),
+            "New_CT_Report": partial_case.get("New_CT_Report") or partial_case.get("ct_report", ""),
+            "CT_Report_Was_Sanitized": partial_case.get("CT_Report_Was_Sanitized", False),
+            "CT_Original_GT": partial_case.get("CT_Original_GT", partial_case.get("CT_GT", ["NONE"])),
+            "CT_GT": partial_case.get("CT_GT", ["NONE"]),
+            "CTA_GT": partial_case.get("CTA_GT", ["NONE"]),
+            "CTP_GT": partial_case.get("CTP_GT", ["NONE"]),
+            "Combined_GT": fallback_combined_labels,
+            "CT_Original_GT_reasoning": partial_case.get("CT_Original_GT_reasoning", ""),
+            "CT_GT_reasoning": partial_case.get("CT_GT_reasoning", ""),
+            "CT_Sanitization_reasoning": partial_case.get("CT_Sanitization_reasoning", ""),
+            "CTA_GT_reasoning": partial_case.get("CTA_GT_reasoning", ""),
+            "CTP_GT_reasoning": partial_case.get("CTP_GT_reasoning", ""),
+            "CT_Combined_GT_reasoning": (
+                "FAILED Combined step. Code fallback used the union of positive "
+                f"CT/CTA/CTP modality labels: {fallback_combined_labels}."
+            ),
+            "reasoning": f"FAILED Combined: {repr(e)}",
+        }
+        final_case = add_review_flags(final_case)
+        final_case["Needs_Review"] = True
+        final_case["Review_Flags"] = [f"Combined step failed: {repr(e)}"] + final_case.get("Review_Flags", [])
+        final_case["Review_Flag_Count"] = len(final_case["Review_Flags"])
+
+        with open(cfg.RAW_OUTPUT_LOG, "a", encoding="utf-8") as f:
+            f.write(f"\n\n=== Case {case_id} ===\n")
+            f.write(json.dumps(final_case, indent=2))
+
+        return final_case
+
+
+async def label_one_case(
+    row: pd.Series,
+    semaphore: asyncio.Semaphore,
+    model: str = MODEL_NAME,
+) -> Dict[str, Any]:
+    """
+    Backward-compatible single-case workflow.
+
+    Useful if another script imports label_one_case directly. This still runs
+    CT/CTA/CTP first, then Combined only after those labels exist.
+    """
+    modality_result = await safe_label_modalities_for_case(row, semaphore, model)
+    if not modality_result["ok"]:
+        return modality_result["final_case"]
+    return await safe_label_combined_for_case(modality_result["partial_case"], semaphore, model)
+
+
+def find_case_row_by_id(
+    df: pd.DataFrame,
+    case_id: str,
+    case_column: str = "Case Name",
+) -> pd.Series:
+    """
+    Find exactly one case row by case ID.
+
+    Matching is done against the spreadsheet's case_column after converting
+    values to strings and stripping whitespace. If multiple rows match, the
+    first row is used and a warning is printed.
+    """
+    if case_column not in df.columns:
+        raise ValueError(
+            f"Could not find case ID column {case_column!r}. "
+            f"Available columns: {list(df.columns)}"
         )
 
-        _apply_result(case, "CTA_GT", result)
-        return case
+    requested_case_id = str(case_id).strip()
+    case_ids = df[case_column].astype(str).str.strip()
+    matches = df.loc[case_ids == requested_case_id]
 
-
-async def label_ctp_for_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any]:
-    """
-    Label the CTP report for one case.
-    """
-
-    async with optional_semaphore(semaphore):
-        report = str(case.get("CTP_Report") or "")
-
-        result = await run_prediction_with_confidence(
-            lambda: label_ctp(report)
+    if matches.empty:
+        available_examples = case_ids.head(10).tolist()
+        raise ValueError(
+            f"Case ID {requested_case_id!r} was not found in column {case_column!r}. "
+            f"First available case IDs: {available_examples}"
         )
 
-        _apply_result(case, "CTP_GT", result)
-        return case
-
-
-async def label_combined_for_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any]:
-    """
-    Label the final Combined_GT for one case.
-
-    Important:
-        This should run after CT, CTA, and CTP have already been labeled.
-
-    Combined uses:
-        - CT report
-        - CTA report
-        - CTP report
-        - MRI report if present
-        - CT_GT / CTA_GT / CTP_GT
-        - modality reasoning
-    """
-
-    async with optional_semaphore(semaphore):
-        result = await run_prediction_with_confidence(
-            lambda: label_combined(case)
+    if len(matches) > 1:
+        print(
+            f"WARNING: Found {len(matches)} rows for case ID {requested_case_id!r}. "
+            "Using the first match."
         )
 
-        # Combined is slightly special because your checker expects the
-        # reasoning field to be named CT_Combined_GT_reasoning.
-        case["Combined_GT"] = result["labels"]
-        case["CT_Combined_GT_reasoning"] = result["reasoning"]
-        case["Combined_GT_is_confident"] = result["is_confident"]
-        case["Combined_GT_confidence_percentage"] = result["confidence_percentage"]
-        case["Combined_GT_possible_answers"] = result["possible_answers"]
-
-        return case
+    return matches.iloc[0]
 
 
-# =============================================================================
-# Full case labeling
-# =============================================================================
-
-async def label_full_case(case: Dict[str, Any], semaphore=None) -> Dict[str, Any]:
+async def label_case_by_id_async(
+    input_file: str,
+    case_id: str,
+    output_file: Optional[str] = None,
+    model: str = MODEL_NAME,
+    max_concurrent_requests: int = MAX_CONCURRENT_REQUESTS,
+    case_column: str = "Case Name",
+    include_reasoning: Optional[bool] = None,
+) -> Dict[str, Any]:
     """
-    Label one full case using the DSPy pipeline.
+    Find, analyze, and label one specific case from the spreadsheet.
 
-    Order:
-        1. CT
-        2. CTA
-        3. CTP
-        4. Combined
-        5. Review flags
+    This is useful for debugging one difficult case without running the full
+    spreadsheet pipeline. It uses the same safe single-case workflow as the
+    full labeler: CT/CTA/CTP run first, then Combined runs only after those
+    labels exist.
 
-    This mirrors your manual pipeline structure.
+    If output_file is provided, the single labeled case is saved as a one-item
+    JSON list so it has the same outer structure as label_spreadsheet_async.
     """
+    df = pd.read_excel(input_file)
+    row = find_case_row_by_id(df, case_id, case_column)
 
-    await label_ct_for_case(case, semaphore)
-    await label_cta_for_case(case, semaphore)
-    await label_ctp_for_case(case, semaphore)
-    await label_combined_for_case(case, semaphore)
+    semaphore = asyncio.Semaphore(max_concurrent_requests)
+    normalized_case_id = str(row[case_column]).strip()
 
-    # Run your deterministic checker after labels/reasoning are present.
-    case = add_review_flags(case)
+    print(f"\n===== Finding case by ID: {case_id} =====")
+    print(f"===== Starting single-case labeling for: {normalized_case_id} =====")
 
-    return case
+    start_time = time.perf_counter()
+    final_case = await label_one_case(row, semaphore, model)
+    finish_time = time.perf_counter()
+
+    if output_file is not None:
+        save_progress(output_file, [final_case], include_reasoning=include_reasoning)
+        print(f"Saved labeled case {normalized_case_id} to {output_file}")
+
+    print(
+        f"Finished single-case labeling for {normalized_case_id} "
+        f"in {round(finish_time - start_time, 3)}s"
+    )
+    return final_case
 
 
-async def label_cases(
-    cases: List[Dict[str, Any]],
-    max_concurrent: int = cfg.MAX_CONCURRENT_CASES,
-) -> List[Dict[str, Any]]:
+def label_case_by_id(
+    input_file: str,
+    case_id: str,
+    output_file: Optional[str] = None,
+    model: str = MODEL_NAME,
+    max_concurrent_requests: int = MAX_CONCURRENT_REQUESTS,
+    case_column: str = "Case Name",
+    include_reasoning: Optional[bool] = None,
+) -> Dict[str, Any]:
     """
-    Label all cases with a single-line dynamic progress bar.
+    Synchronous wrapper for label_case_by_id_async.
 
-    The progress bar updates in place and includes the current date/time beside
-    the bar.  Because this pipeline runs cases concurrently, results are
-    returned as each case finishes, not necessarily in the original input order.
+    Use this from regular scripts. If you are already inside async code, call
+    await label_case_by_id_async(...) instead.
     """
-    initialize_dspy_programs()
-
-    total_cases = len(cases)
-    if total_cases == 0:
-        return []
-
-    semaphore = asyncio.Semaphore(max_concurrent)
-
-    tasks = [
-        asyncio.create_task(label_full_case(case, semaphore))
-        for case in cases
-    ]
-
-    results: List[Dict[str, Any]] = []
-
-    def current_timestamp() -> str:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    progress_bar = tqdm(
-        total=total_cases,
-        desc="Labeling cases",
-        unit="case",
-        dynamic_ncols=True,
-        leave=True,
-        bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] | {postfix}",
+    return asyncio.run(
+        label_case_by_id_async(
+            input_file=input_file,
+            case_id=case_id,
+            output_file=output_file,
+            model=model,
+            max_concurrent_requests=max_concurrent_requests,
+            case_column=case_column,
+            include_reasoning=include_reasoning,
+        )
     )
 
-    # Initial date/time display before the first case completes.
-    progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
+def safe_modality_result(result, modality):
+    if isinstance(result, Exception):
+        return {
+            "modality": modality,
+            "labels": ["NONE"],
+            "reasoning": f"FAILED {modality}: {repr(result)}",
+        }
+    return result
 
-    async def refresh_clock() -> None:
-        """
-        Refresh the date/time while cases are running.
+async def label_spreadsheet_async(
+    input_file: str,
+    output_file: str,
+    model: str = MODEL_NAME,
+    max_concurrent_requests: int = MAX_CONCURRENT_REQUESTS,
+    use_cache: bool = True,
+    include_reasoning: Optional[bool] = None,
+) -> List[Dict[str, Any]]:
+    """Label a spreadsheet with caching support for resumable runs.
+    
+    Args:
+        input_file: Path to input Excel file
+        output_file: Path to output JSON file
+        model: Ollama model to use
+        max_concurrent_requests: Max concurrent API requests
+        use_cache: Whether to skip already-processed cases
+        include_reasoning: Whether to include reasoning fields in the final output JSON.
+            None means use config.INCLUDE_REASONING_IN_JSON.
+    """
+    # Load cache if enabled
+    cache = ProcessingCache() if use_cache else None
+    
+    df = pd.read_excel(input_file)
+    semaphore = asyncio.Semaphore(max_concurrent_requests)
 
-        This keeps the timestamp live even during long model calls.  It updates
-        the same tqdm line instead of printing new lines.
-        """
+    # Load existing output if resuming
+    labeled_cases: List[Dict[str, Any]] = []
+    if use_cache and Path(output_file).exists():
         try:
-            while progress_bar.n < total_cases:
-                progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            return
+            with open(output_file, "r", encoding="utf-8") as f:
+                labeled_cases = json.load(f)
+            print(f"Loaded {len(labeled_cases)} previously processed cases from {output_file}")
+        except (json.JSONDecodeError, IOError):
+            labeled_cases = []
+    
+    pending_final_task: Optional[asyncio.Task[Dict[str, Any]]] = None
 
-    clock_task = asyncio.create_task(refresh_clock())
+    start_time = time.perf_counter()
+    skipped_count = 0
+    processed_count = 0
 
-    try:
-        for completed_task in asyncio.as_completed(tasks):
-            result = await completed_task
-            results.append(result)
-            progress_bar.update(1)
-            progress_bar.set_postfix_str(f"now={current_timestamp()}", refresh=True)
-    finally:
-        clock_task.cancel()
-        try:
-            await clock_task
-        except asyncio.CancelledError:
-            pass
-        progress_bar.set_postfix_str(f"finished={current_timestamp()}", refresh=True)
-        progress_bar.close()
+    for index, row in df.iterrows():
+        case_id = str(row["Case Name"])
+        
+        # Skip if already processed and caching is enabled
+        if cache and cache.is_processed(case_id):
+            skipped_count += 1
+            continue
+        
+        print(f"\n===== Starting CT/CTA/CTP for case {index + 1}/{len(df)}: {case_id} =====")
 
-    return results
+        # Start current case CT/CTA/CTP immediately. If there is a previous
+        # Combined task pending, it runs at the same time as these modality tasks.
+        current_modalities_task = asyncio.create_task(
+            safe_label_modalities_for_case(row, semaphore, model)
+        )
 
+        if pending_final_task is not None:
+            previous_final_case, current_modality_result = await asyncio.gather(
+                pending_final_task,
+                current_modalities_task,
+            )
+            labeled_cases.append(previous_final_case)
+            processed_count += 1
+            if cache:
+                cache.mark_processed(previous_final_case["case_id"])
+            save_progress(output_file, labeled_cases, include_reasoning=include_reasoning)
+        else:
+            current_modality_result = await current_modalities_task
+
+        # Start this case's Combined step only after this case's CT/CTA/CTP
+        # have finished and produced labels.
+        if current_modality_result["ok"]:
+            print(f"===== Starting Combined for case {case_id} =====")
+            pending_final_task = asyncio.create_task(
+                safe_label_combined_for_case(
+                    current_modality_result["partial_case"],
+                    semaphore,
+                    model,
+                )
+            )
+        else:
+            # No Combined task is created when CT/CTA/CTP failed.
+            async def already_done(final_case: Dict[str, Any]) -> Dict[str, Any]:
+                return final_case
+
+            pending_final_task = asyncio.create_task(already_done(current_modality_result["final_case"]))
+
+    # Flush the final case's Combined result.
+    if pending_final_task is not None:
+        final_case = await pending_final_task
+        labeled_cases.append(final_case)
+        processed_count += 1
+        if cache:
+            cache.mark_processed(final_case["case_id"])
+        save_progress(output_file, labeled_cases, include_reasoning=include_reasoning)
+
+    # Save cache state
+    if cache:
+        cache.save_cache()
+
+    # If everything was skipped because of cache, still rewrite the output so
+    # changing INCLUDE_REASONING_IN_JSON / --no-reasoning is reflected.
+    if labeled_cases and skipped_count > 0 and processed_count == 0:
+        save_progress(output_file, labeled_cases, include_reasoning=include_reasoning)
+
+    finish_time = time.perf_counter()
+
+    print(f"Saved {len(labeled_cases)} labeled cases to {output_file}")
+    if skipped_count > 0:
+        print(f"Skipped {skipped_count} already-processed cases (cached)")
+    print(f"Total Time Taken: {str(round(finish_time - start_time, 3))}s")
+    return labeled_cases

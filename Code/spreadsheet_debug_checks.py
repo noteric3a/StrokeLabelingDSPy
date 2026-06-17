@@ -12,19 +12,82 @@ import re
 from typing import Any
 
 import pandas as pd
-import config as cfg
 
 
-CASE_ID_COLUMN_CANDIDATES = cfg.CASE_ID_COLUMN_CANDIDATES
-LABEL_COLUMNS = cfg.LABEL_COLUMNS
-SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS = cfg.SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS
-SUBARACHNOID_REVIEW_TERMS = cfg.SUBARACHNOID_REVIEW_TERMS
-SUBDURAL_SCAN_COLUMNS = cfg.SUBDURAL_SCAN_COLUMNS
-FALLBACK_ALLOWED_LABELS = cfg.FALLBACK_ALLOWED_LABELS
+CASE_ID_COLUMN_CANDIDATES = (
+    "case_id",
+    "Case ID",
+    "Case Name",
+    "Case_Name",
+    "case name",
+    "CASE_ID",
+    "Case",
+)
+
+LABEL_COLUMNS = (
+    "CT_Original_GT",
+    "CT_GT",
+    "CTA_GT",
+    "CTP_GT",
+    "Combined_GT",
+)
+
+
+SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS = (
+    "subdural hematoma",
+    "subdural haemorrhage",
+    "subdural hemorrhage",
+    "subdural blood",
+    "subdural collection",
+    "acute subdural",
+    "sdh",
+    "extra-axial hematoma",
+    "extra-axial haemorrhage",
+    "extra-axial hemorrhage",
+    "extra-axial blood",
+    "extraaxial hematoma",
+    "extraaxial hemorrhage",
+)
+
+SUBARACHNOID_REVIEW_TERMS = (
+    "subarachnoid hemorrhage",
+    "subarachnoid haemorrhage",
+    "subarachnoid blood",
+    "sah",
+)
+
+SUBDURAL_SCAN_COLUMNS = (
+    ("CT_Report", "CT report"),
+    ("New_CT_Report", "sanitized CT report"),
+    ("MRI_Report", "MRI report"),
+    ("CTA_Report", "CTA brain-window text"),
+    ("CTP_Report", "CTP context text"),
+)
+
+FALLBACK_ALLOWED_LABELS = {
+    "NONE",
+    "RMCA", "LMCA",
+    "RACA", "LACA",
+    "RPCA", "LPCA",
+    "RPICA", "LPICA",
+    "RVA", "LVA",
+    "RICA", "LICA",
+    "RCA", "LCA",
+    "BA",
+}
+
 
 def _allowed_labels() -> set[str]:
-    """Read allowed labels from config.py."""
-    return {str(label).strip().upper() for label in cfg.ALLOWED_LABELS if str(label).strip()}
+    """Read config.ALLOWED_LABELS when available, otherwise use a safe fallback."""
+    try:
+        import config  # type: ignore
+
+        labels = getattr(config, "ALLOWED_LABELS", None)
+        if isinstance(labels, (list, tuple, set)):
+            return {str(label).strip().upper() for label in labels if str(label).strip()}
+    except Exception:
+        pass
+    return set(FALLBACK_ALLOWED_LABELS)
 
 
 def _normalize_column_name(name: Any) -> str:
