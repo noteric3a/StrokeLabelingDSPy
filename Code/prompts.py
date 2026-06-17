@@ -27,8 +27,121 @@ def label_order_text() -> str:
     return ", ".join([label for label in LABEL_ORDER if label in ALLOWED_LABELS])
 
 
+def generate_label_reasoning() -> bool:
+    """Return whether label prompts should request visible reasoning fields."""
+    return bool(getattr(cfg, "GENERATE_LABEL_REASONING", False))
+
+
+def generate_sanitizer_reasoning() -> bool:
+    """Return whether the CT sanitizer should request visible reasoning fields."""
+    return bool(getattr(cfg, "GENERATE_SANITIZER_REASONING", False))
+
+
+def no_think_directive() -> str:
+    """Return an optional no-thinking directive for reasoning models."""
+    if not bool(getattr(cfg, "DSPY_DISABLE_THINKING", True)):
+        return ""
+    directive = str(getattr(cfg, "DSPY_PROMPT_NO_THINK_DIRECTIVE", "/no_think")).strip()
+    if not directive:
+        return ""
+    return (
+        f"{directive}\n"
+        "Do not output hidden reasoning, chain-of-thought, scratchpad, "
+        "analysis, self-correction, or explanations."
+    )
+
+
+def label_reasoning_prompt_rule() -> str:
+    if generate_label_reasoning():
+        return "Reasoning must be concise and cite only evidence from the report being labeled."
+    return "Do not include a reasoning field. Do not output analysis, scratchpad, self-correction, or explanation."
+
+
+def label_reasoning_style_rule(label_field: str = "labels") -> str:
+    if generate_label_reasoning():
+        return f"""
+Reasoning style:
+- Do not debate multiple possible interpretations.
+- Use 1 to 3 short sentences only.
+- Cite only the strongest qualifying or disqualifying report phrase.
+- If the final answer is ["NONE"], state the single reason no finding qualifies.
+- Do not mention labels that are not in {label_field}, unless explaining why {label_field} is ["NONE"].
+- The reasoning must not end with a different conclusion than {label_field}.
+""".strip()
+    return """
+No-reasoning output mode:
+- Decide internally, but output only the required JSON fields.
+- Do not include reasoning, explanation, chain-of-thought, scratchpad, analysis, self-correction, or comments.
+""".strip()
+
+
+def json_structure_single(case_id: str, modality: str) -> str:
+    if generate_label_reasoning():
+        return (
+            '{\n'
+            f'  "case_id": "{case_id}",\n'
+            f'  "modality": "{modality}",\n'
+            '  "labels": ["<LABELS>"],\n'
+            '  "reasoning": "One concise sentence supporting only the final labels"\n'
+            '}'
+        )
+    return (
+        '{\n'
+        f'  "case_id": "{case_id}",\n'
+        f'  "modality": "{modality}",\n'
+        '  "labels": ["<LABELS>"]\n'
+        '}'
+    )
+
+
+def json_structure_combined(case_id: str) -> str:
+    if generate_label_reasoning():
+        return (
+            '{\n'
+            f'  "case_id": "{case_id}",\n'
+            '  "Combined_GT": ["<LABELS>"],\n'
+            '  "reasoning": "One concise sentence supporting only the final Combined_GT labels"\n'
+            '}'
+        )
+    return (
+        '{\n'
+        f'  "case_id": "{case_id}",\n'
+        '  "Combined_GT": ["<LABELS>"]\n'
+        '}'
+    )
+
+
+def json_structure_sanitizer(case_id: str) -> str:
+    if generate_sanitizer_reasoning():
+        return (
+            '{\n'
+            f'  "case_id": "{case_id}",\n'
+            '  "contamination_found": true,\n'
+            '  "sanitized_report": "CT-only report text after removing CTA/CTP contamination, or the original report if no contamination was found",\n'
+            '  "removed_sections": ["short description or exact removed CTA/CTP sentence"],\n'
+            '  "reasoning": "Brief explanation of what was removed or why no removal was needed"\n'
+            '}'
+        )
+    return (
+        '{\n'
+        f'  "case_id": "{case_id}",\n'
+        '  "contamination_found": true,\n'
+        '  "sanitized_report": "CT-only report text after removing CTA/CTP contamination, or the original report if no contamination was found",\n'
+        '  "removed_sections": ["short description or exact removed CTA/CTP sentence"]\n'
+        '}'
+    )
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    text = str(text or "").strip()
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    return text[: max_chars - 80].rstrip() + "\n[TRUNCATED optimized guidance to avoid prompt bloat]"
+
+
 def final_consistency_check(label_field: str = "labels") -> str:
-    return f"""
+    if generate_label_reasoning():
+        return f"""
 Final consistency check before returning JSON:
 - Re-read the reasoning you are about to output.
 - Identify the exact labels that your reasoning supports.
@@ -38,6 +151,17 @@ Final consistency check before returning JSON:
 - If two label sets seem possible, choose the smaller label set that is directly supported by explicit report wording; do not add extra labels from mechanism, broad vascular supply, or uncertainty.
 - If there is any conflict between your reasoning and {label_field}, revise {label_field} before output.
 """.strip()
+    return f"""
+Final consistency check before returning JSON:
+- Set {label_field} to exactly the labels supported by explicit report wording.
+- If two label sets seem possible, choose the smaller label set that is directly supported by explicit report wording; do not add extra labels from mechanism, broad vascular supply, or uncertainty.
+- If a label is excluded, omitted, does not qualify, should be removed, or should not be labeled, that label must not appear in {label_field}.
+- Do not output reasoning, analysis, scratchpad, self-correction, or explanation.
+""".strip()
+
+
+def concise_reasoning_rule(label_field: str = "labels") -> str:
+    return label_reasoning_style_rule(label_field)
 
 
 def base_rules() -> str:
@@ -51,7 +175,7 @@ Output rules:
 - Use ["NONE"] only when the report gives no qualifying acute/recent/current stroke-territory evidence.
 - If any territory label is present, do not include "NONE".
 - If multiple labels are needed, use this order: {label_order_text()}.
-- Reasoning must only cite evidence from the report being labeled.
+- {label_reasoning_prompt_rule()}
 
 Labeling policy:
 - Score acute stroke territory, not every old/subacute/chronic infarct ever seen.
@@ -105,28 +229,16 @@ Evidence rules:
 - Do not add secondary labels from mechanism or broad lobe wording. Add a second label only when that second territory has its own explicit vessel, infarct, ischemia, diffusion, or perfusion evidence.
 
 Self-check:
-- Labels must match the reasoning exactly.
-- The final label array is not a separate guess; it must be the exact label set defended by the reasoning sentence.
-- If the reasoning says "only", "excluded", "omitted", "does not qualify", or "not enough", update the final labels so they match that statement.
-- If reasoning says MCA/M1/M2/insula/operculum/basal ganglia/corona radiata/centrum semiovale, output RMCA or LMCA.
-- If output includes RACA/LACA, reasoning must cite ACA/A1/A2/A3 or ACA-specific anatomy. Broad "frontal", "posterior frontal", "frontoparietal", or "corona radiata/centrum semiovale" wording is not enough for ACA.
-- If output includes RPCA/LPCA, reasoning must cite PCA/P1/P2/P3/P4 or PCA-specific anatomy.
-- If output includes RPICA/LPICA, reasoning must cite PICA or inferior cerebellar/PICA-specific anatomy.
-- If output includes RVA/LVA, reasoning must cite the right/left vertebral artery or a right/left vertebral artery segment such as V1/V2/V3/V4; do not infer RVA/LVA from generic posterior-circulation wording alone.
-- If output includes RICA/LICA in CT or CTP, the reasoning must explain why the report is an unseparated ICA/carotid-territory pattern rather than a specific MCA/ACA tissue/perfusion territory.
+- Labels must match explicit report evidence exactly.
+- The final label array is not a separate guess; it must be the exact label set supported by the report.
+- If a finding is excluded, omitted, does not qualify, or has not enough evidence, do not include that label.
+- If report evidence says MCA/M1/M2/insula/operculum/basal ganglia/corona radiata/centrum semiovale, output RMCA or LMCA.
+- If output includes RACA/LACA, the report must cite ACA/A1/A2/A3 or ACA-specific anatomy. Broad "frontal", "posterior frontal", "frontoparietal", or "corona radiata/centrum semiovale" wording is not enough for ACA.
+- If output includes RPCA/LPCA, the report must cite PCA/P1/P2/P3/P4 or PCA-specific anatomy.
+- If output includes RPICA/LPICA, the report must cite PICA or inferior cerebellar/PICA-specific anatomy.
+- If output includes RVA/LVA, the report must cite the right/left vertebral artery or a right/left vertebral artery segment such as V1/V2/V3/V4; do not infer RVA/LVA from generic posterior-circulation wording alone.
+- If output includes RICA/LICA in CT or CTP, the report must explicitly frame the abnormality as an unseparated ICA/carotid-territory pattern rather than a specific MCA/ACA tissue/perfusion territory.
 - Do not output RCA/LCA unless those labels are present in the allowed-label list.
-""".strip()
-
-
-def concise_reasoning_rule(label_field: str = "labels") -> str:
-    return f"""
-Reasoning style:
-- Do not debate multiple possible interpretations.
-- Use 1 to 3 short sentences only.
-- Cite only the strongest qualifying or disqualifying report phrase.
-- If the final answer is ["NONE"], state the single reason no finding qualifies.
-- Do not mention labels that are not in {label_field}, unless explaining why {label_field} is ["NONE"].
-- The reasoning must not end with a different conclusion than {label_field}.
 """.strip()
 
 
@@ -170,6 +282,21 @@ def optimized_prompt_guidance(modality: str) -> str:
     if not guidance:
         return ""
 
+    suspicious_markers = (
+        "here's a thinking process",
+        "reasoning_content",
+        "self-correction",
+        "output generation",
+        "adapterparseerror",
+        "expected to find output fields",
+    )
+    lower_guidance = guidance.lower()
+    if any(marker in lower_guidance for marker in suspicious_markers):
+        return ""
+
+    max_chars = int(getattr(cfg, "OPTIMIZED_PROMPT_MAX_CHARS", 2500))
+    guidance = _truncate_text(guidance, max_chars)
+
     return f"""
 DSPy-optimized guidance for {str(modality).upper()}:
 {guidance}
@@ -179,6 +306,8 @@ DSPy-optimized guidance for {str(modality).upper()}:
 def build_ct_sanitization_prompt(case_id: str, ct_report: str) -> str:
     return f"""
 You are cleaning a report that is supposed to be ONLY a non-contrast CT head/brain report.
+
+{no_think_directive()}
 
 Your job:
 1. Detect whether the supplied CT report contains CTA/CT angiogram or CTP/perfusion findings mixed into it.
@@ -220,19 +349,15 @@ Original CT Report:
 {ct_report}
 
 Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "contamination_found": true,
-  "sanitized_report": "CT-only report text after removing CTA/CTP contamination, or the original report if no contamination was found",
-  "removed_sections": ["short description or exact removed CTA/CTP sentence"],
-  "reasoning": "Brief explanation of what was removed or why no removal was needed"
-}}
+{json_structure_sanitizer(case_id)}
 """.strip()
 
 
 def build_ct_prompt(case_id: str, ct_report: str) -> str:
     return f"""
 You are labeling ONLY the non-contrast CT report for acute stroke territory.
+
+{no_think_directive()}
 
 {base_rules()}
 
@@ -245,7 +370,7 @@ Required CT step-by-step decision process:
 - Step 2: For each candidate, check whether the same sentence, clause, or impression phrase actually supports acute/recent ischemic territory labeling. Eliminate candidates supported only by chronic/old/remote/stable/unchanged/known/evolving-follow-up/subacute-only wording, postoperative/moyamoya/bypass-related change, hemorrhage/contusion/subdural/subarachnoid/extra-axial blood without explicit infarct/ischemia, artifact, weak/questionable/subtle/possible wording with a negative acute impression, or CTA/CTP-only evidence.
 - Step 3: Map only the surviving CT candidates to territories. Deep structures such as basal ganglia, lentiform, putamen, caudate, internal capsule, corona radiata, centrum semiovale, insula, and operculum map to MCA. Occipital, calcarine, posterior temporal, and thalamic findings map to PCA. Medial/parafalcine/parasagittal/cingulate/corpus-callosum/pericallosal/callosomarginal findings map to ACA. Pontine/brainstem findings described as basilar-territory map to BA. Inferior or posterior-inferior cerebellar findings map to PICA.
 - Step 4: Apply conservative CT tie-breakers after elimination. If the report says no acute infarct/no acute intracranial abnormality and the only candidate is weak, subtle, questionable, or possible, return ["NONE"]. If a label is anatomically possible but not directly supported by CT wording, eliminate it. If two label sets seem possible, choose the smaller label set directly supported by explicit CT wording.
-- Step 5: Return only the labels that survive elimination. If no candidate survives, return ["NONE"]. Do this candidate/elimination process internally; final reasoning should briefly name the kept label(s) or the single strongest reason nothing qualifies, without printing a long candidate ledger or self-correction.
+- Step 5: Return only the labels that survive elimination. If no candidate survives, return ["NONE"]. Do this candidate/elimination process internally; do not print a candidate ledger, reasoning, or self-correction unless reasoning output is enabled in config.py.
 
 CT candidate-elimination examples:
 - "No acute intracranial abnormality" plus "questionable/subtle hypodensity" -> eliminate the weak candidate and return ["NONE"].
@@ -294,18 +419,15 @@ CT Report:
 {concise_reasoning_rule("labels")}
 
 Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "modality": "CT",
-  "labels": ["<LABELS>"],
-  "reasoning": "CT-only reason supporting the final labels"
-}}
+{json_structure_single(case_id, "CT")}
 """.strip()
 
 
 def build_cta_prompt(case_id: str, cta_report: str) -> str:
     return f"""
 You are labeling ONLY CTA vessel abnormalities.
+
+{no_think_directive()}
 
 Allowed labels:
 {labels_text()}
@@ -327,7 +449,7 @@ Required CTA step-by-step decision process:
 - Step 3: Eliminate each candidate that is stenosis-only, narrowing-only, atherosclerosis/plaque-only, chronic/stable/known/old, postoperative collateral/reconstitution-only, hypoplastic/aplastic/fetal/variant anatomy, limited-evaluation/cannot-exclude wording, or uncertain "stenosis versus occlusion" wording without a separate definite occlusion/thrombus/filling-defect/cutoff phrase.
 - Step 4: After eliminations, apply the ICA rule. Keep RICA/LICA when ICA/carotid occlusion is definite and downstream MCA/ACA evidence is not both independently definite. Drop RICA/LICA only when same-side MCA and ACA are both independently definite.
 - Step 5: Return only the labels that survive elimination. If no candidate survives, return ["NONE"].
-- Do this candidate/elimination process internally. In the final reasoning, briefly name the kept label(s) and only mention eliminated labels when they are the main reason a tempting label was not included. Do not output a long debate, self-correction, or "wait" reasoning.
+- Do this candidate/elimination process internally. Do not output a long debate, self-correction, or "wait" reasoning. If reasoning output is disabled in config.py, output no reasoning at all.
 
 CTA candidate-elimination example:
 - "Complete occlusion of the left internal carotid" -> candidate LICA survives.
@@ -395,7 +517,7 @@ Side and territory self-check:
 - Vertebral artery labels require definite occlusion/thrombus/cutoff/filling defect/nonopacification/near-occlusion. Vertebral stenosis or narrowing alone is not RVA/LVA.
 - PCA labels require occlusion/thrombus/cutoff/filling defect/segmental occlusion. P2/P3 stenosis or narrowing alone is not RPCA/LPCA.
 - "possible short-segment occlusion" or "may be a short segment thrombus" of P1/P2/P3/P4 qualifies as RPCA/LPCA; "stenosis/narrowing" alone does not. Example: "may be a short segmental thrombus in the left P2 PCA" -> ["LPCA"].
-- If reasoning says a finding is "not enough", "does not qualify", "stenosis alone", or "limited evaluation", the final label for that finding must be omitted.
+- If the report wording says a finding is "not enough", "does not qualify", "stenosis alone", or "limited evaluation", the final label for that finding must be omitted.
 
 Examples:
 - "moderate stenosis of left M2" -> ["NONE"]
@@ -430,7 +552,7 @@ CTA multi-vessel scan:
 - Do not infer downstream MCA/ACA/PCA/PICA from ICA/carotid or vertebral artery disease alone. Downstream labels require their own CTA evidence.
 
 Final CTA label reconciliation:
-- Before returning the final CTA labels, compare the reasoning against the labels array.
+- Before returning the final CTA labels, compare the explicit CTA report evidence against the labels array.
 - If the CTA report directly describes a definite occlusion, thrombus, filling defect, flow cutoff, absent opacification, or near-occlusion in the ICA/internal carotid/carotid terminus, the matching RICA/LICA label must be included unless the same-side MCA and ACA are both independently definite CTA-positive.
 - Do not drop RICA/LICA only because a downstream MCA or ACA abnormality is also present.
 - Drop RICA/LICA only when both same-side downstream territories are independently definite, such as definite MCA/M1/M2 involvement and definite ACA/A1/A2/A3 involvement.
@@ -438,7 +560,7 @@ Final CTA label reconciliation:
 - If only one same-side downstream territory is definite, keep both the ICA/carotid label and the definite downstream territory label.
 - A hypoplastic, variant, cross-filled, contralateral-supplied, collateral-supplied, or uncertain ACA/A1/A2 does not count as definite ACA involvement and must not be used to drop RICA/LICA.
 - If the CTA report directly describes a definite right or left vertebral artery/V1/V2/V3/V4 occlusion, thrombus, filling defect, flow cutoff, absent opacification, nonopacification, or near-occlusion, the matching RVA/LVA label must be included unless it is explicitly chronic/stable or stenosis-only.
-- The final labels must match the reasoning. If the reasoning mentions a definite qualifying ICA/carotid abnormality but the labels omit RICA/LICA, revise the labels before output. If the reasoning mentions a definite qualifying vertebral abnormality but the labels omit RVA/LVA, revise the labels before output.
+- The final labels must match explicit CTA report evidence. If the report mentions a definite qualifying ICA/carotid abnormality but the labels omit RICA/LICA, revise the labels before output. If the report mentions a definite qualifying vertebral abnormality but the labels omit RVA/LVA, revise the labels before output.
 
 Case ID:
 {case_id}
@@ -451,18 +573,15 @@ CTA Report:
 {concise_reasoning_rule("labels")}
 
 Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "modality": "CTA",
-  "labels": ["<LABELS>"],
-  "reasoning": "CTA-only reason supporting the final labels"
-}}
+{json_structure_single(case_id, "CTA")}
 """.strip()
 
 
 def build_ctp_prompt(case_id: str, ctp_report: str) -> str:
     return f"""
 You are labeling ONLY the CTP/perfusion report for acute stroke territory.
+
+{no_think_directive()}
 
 {base_rules()}
 
@@ -474,7 +593,7 @@ Required CTP step-by-step decision process:
 - Step 3: Eliminate each candidate that is tiny/nonspecific (<10 mL Tmax/mismatch with 0 mL core and relative/nonspecific wording), artifact-only, chronic/stigmata-of-moyamoya/collateral/bypass-related, global/bilateral/nonspecific without separate side-specific territory evidence, or unsupported by a named/mapped territory.
 - Step 4: Apply mapping after eliminations. Named MCA/ACA/PCA/PICA/BA perfusion territories beat broad mechanism. Use RICA/LICA only when the CTP report frames the perfusion abnormality as an unseparated ICA/carotid-territory pattern and does not separate MCA/ACA territories.
 - Step 5: Return only surviving candidates. If no candidate survives, return ["NONE"].
-- Do this candidate/elimination process internally. In the final reasoning, briefly name the kept label(s) and only mention eliminated labels when needed. Do not output a long debate, self-correction, or "wait" reasoning.
+- Do this candidate/elimination process internally. Do not output a long debate, self-correction, or "wait" reasoning. If reasoning output is disabled in config.py, output no reasoning at all.
 
 CTP-specific rules:
 - Apply literal report-text rules before broader anatomy inference.
@@ -531,12 +650,7 @@ CTP Report:
 {concise_reasoning_rule("labels")}
 
 Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "modality": "CTP",
-  "labels": ["<LABELS>"],
-  "reasoning": "CTP-only reason supporting the final labels"
-}}
+{json_structure_single(case_id, "CTP")}
 """.strip()
 
 
@@ -552,6 +666,8 @@ def build_combined_prompt(
 ) -> str:
     return f"""
 You are assigning Combined_GT across CT, CTA, CTP, and MRI.
+
+{no_think_directive()}
 This is a reconciliation step: do not re-label CT, CTA, or CTP from scratch.
 
 Allowed labels:
@@ -570,7 +686,7 @@ Output rules:
 - Use ["NONE"] only if no candidate survives.
 - If any territory label is present, do not include "NONE".
 - Use this label order: {label_order_text()}.
-- Reasoning must be 1 to 3 concise sentences and must support only Combined_GT.
+- {label_reasoning_prompt_rule()}
 
 Required internal workflow:
 1. Build candidates.
@@ -635,9 +751,5 @@ MRI Report:
 {final_consistency_check("Combined_GT")}
 
 Return exactly this JSON structure:
-{{
-  "case_id": "{case_id}",
-  "Combined_GT": ["<LABELS>"],
-  "reasoning": "1 to 3 concise sentences supporting only the final Combined_GT labels"
-}}
+{json_structure_combined(case_id)}
 """.strip()

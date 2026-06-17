@@ -20,9 +20,9 @@ CODE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CODE_DIR.parent
 FILES_DIR = PROJECT_ROOT / "Files"
 FILES_DIR_DEBUG = PROJECT_ROOT / "Files" / "Debug"
-FINISHED_CASES_ROOT = FILES_DIR / "Finished Cases"
-GROUND_TRUTH_DIR = FILES_DIR / "GT"
-REPORTS_DIR = FILES_DIR / "Report"
+FINISHED_CASES_ROOT = FILES_DIR / "finished_cases"
+GROUND_TRUTH_DIR = FILES_DIR / "GroundTruth"
+REPORTS_DIR = FILES_DIR / "Reports"
 
 # Make sure all directories exist
 FILES_DIR.mkdir(exist_ok=True)
@@ -35,8 +35,8 @@ MODEL_NAME = "qwen3.6:latest"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 # Input/output files
-INPUT_REPORTS_FILE = REPORTS_DIR / "New Reports.xlsx"
-GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / "GroundTruthKeyNew.xlsx"
+INPUT_REPORTS_FILE = REPORTS_DIR / "flagged_not_confident_cases_retest_input.xlsx"
+GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / ""
 OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
 
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
 # False: run the normal labeler pipeline.
 # True: run DSPy prompt optimization using the INPUT_REPORTS_FILE and
 # GROUND_TRUTH_FILE below, write OPTIMIZED_PROMPTS_FILE, then exit.
-RUN_PROMPT_OPTIMIZATION = True
+RUN_PROMPT_OPTIMIZATION = False
 
 # True: compare the generated JSON to GROUND_TRUTH_FILE after labeling.
 # False: label and convert output without validation.
@@ -57,12 +57,22 @@ RUN_VALIDATION_AFTER_LABELING = True
 
 # True: use the resumable ProcessingCache.
 # False: ignore the cache and reprocess all rows.
-USE_PROCESSING_CACHE = False
+USE_PROCESSING_CACHE = True
 
 # True: include *_reasoning fields in labeled_cases.json and the converted Excel file.
 # False: omit reasoning text from the final output JSON/Excel while still keeping
 # debug logs available in Files/finished_cases/<run>/Debug/.
 INCLUDE_REASONING_IN_JSON = True
+
+# True: ask the LLM to generate concise visible reasoning fields in label JSON.
+# False: remove label reasoning from the Ollama JSON schema and prompt examples.
+# This is the strongest setting for preventing long chain-of-thought /
+# reasoning_content from consuming the response budget or breaking JSON parsing.
+GENERATE_LABEL_REASONING = False
+
+# The CT sanitizer is separate from label generation. Keep this False if your
+# model tends to spill long reasoning into JSON responses.
+GENERATE_SANITIZER_REASONING = False
 
 
 # ---------------------------------------------------------------------------
@@ -85,14 +95,28 @@ DSPY_MODALITIES = ["CT", "CTA", "CTP", "COMBINED"]
 # `ollama_chat/<model>` works with the chat endpoint exposed by Ollama.
 DSPY_LM = f"ollama_chat/{MODEL_NAME}"
 DSPY_API_BASE = "http://localhost:11434"
-DSPY_OPTIMIZER = "MIPROv2"  # MIPROv2, BootstrapFewShot, or LabeledFewShot
-DSPY_AUTO = "light"          # MIPROv2 search budget: light, medium, heavy
+# Use LabeledFewShot for the most stable local-Ollama optimization path.
+# MIPROv2 can still be used, but some local reasoning models may put their
+# instruction-proposal answer into reasoning_content instead of final JSON.
+DSPY_OPTIMIZER = "LabeledFewShot"  # MIPROv2, BootstrapFewShot, or LabeledFewShot
+DSPY_AUTO = "light"                # MIPROv2 search budget: light, medium, heavy
 DSPY_MAX_LABELED_DEMOS = 4
-DSPY_MAX_BOOTSTRAPPED_DEMOS = 2
+DSPY_MAX_BOOTSTRAPPED_DEMOS = 0
 DSPY_NUM_THREADS = 1
 DSPY_SEED = 9
 DSPY_TRAIN_LIMIT = 60
 DSPY_VAL_LIMIT = 30
+
+# DSPy prompt-generation safety controls.
+DSPY_USE_CHAIN_OF_THOUGHT = False
+DSPY_DISABLE_THINKING = True
+DSPY_PROMPT_NO_THINK_DIRECTIVE = "/no_think"
+
+# Prevent an optimized prompt artifact from injecting a huge instruction or
+# accidental model reasoning dump into every production prompt.
+OPTIMIZED_PROMPT_MAX_CHARS = 2500
+DSPY_EXTRACTED_INSTRUCTIONS_MAX_CHARS = 1200
+DSPY_GUIDANCE_MAX_CHARS = 2500
 
 
 # Confidence checking controls

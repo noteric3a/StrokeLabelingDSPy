@@ -211,8 +211,13 @@ def _make_stroke_program(dspy: Any) -> Any:
     class StrokeTerritorySignature(dspy.Signature):
         """Label acute/recent stroke territory from radiology text.
 
-        Return only allowed labels.  Use NONE only when the report has no
-        qualifying acute/recent/current territory evidence.  Prefer the smaller
+        /no_think
+
+        Return final answer only. Do not include hidden reasoning, scratchpad,
+        chain-of-thought, analysis, self-correction, or explanation.
+
+        Return only allowed labels. Use NONE only when the report has no
+        qualifying acute/recent/current territory evidence. Prefer the smaller
         label set when evidence is ambiguous, and never include NONE with a real
         territory label.
         """
@@ -224,13 +229,15 @@ def _make_stroke_program(dspy: Any) -> Any:
         ct_labels: str = dspy.InputField(desc="Preliminary CT labels, or NONE")
         cta_labels: str = dspy.InputField(desc="Preliminary CTA labels, or NONE")
         ctp_labels: str = dspy.InputField(desc="Preliminary CTP labels, or NONE")
-        labels: list[str] = dspy.OutputField(desc="A JSON-style list of labels chosen only from allowed_labels")
-        reasoning: str = dspy.OutputField(desc="One concise sentence explaining the strongest evidence")
+        labels: list[str] = dspy.OutputField(
+            desc="A JSON-style list of labels chosen only from allowed_labels. Return labels only; no reasoning."
+        )
 
     class StrokeTerritoryProgram(dspy.Module):
         def __init__(self) -> None:
             super().__init__()
-            self.predict = dspy.ChainOfThought(StrokeTerritorySignature)
+            predictor_class = dspy.ChainOfThought if bool(getattr(cfg, "DSPY_USE_CHAIN_OF_THOUGHT", False)) else dspy.Predict
+            self.predict = predictor_class(StrokeTerritorySignature)
 
         def forward(
             self,
@@ -252,7 +259,8 @@ def _make_stroke_program(dspy: Any) -> Any:
                 ctp_labels=ctp_labels,
             )
             pred.labels = _normalize_label_value(getattr(pred, "labels", []))
-            pred.reasoning = str(getattr(pred, "reasoning", "")).strip()
+            # Keep this attribute empty for compatibility with old helper code.
+            pred.reasoning = ""
             return pred
 
     return StrokeTerritoryProgram()
@@ -341,8 +349,7 @@ def _build_examples_for_modality(
                 ct_labels=ct_labels,
                 cta_labels=cta_labels,
                 ctp_labels=ctp_labels,
-                labels=labels,
-                reasoning=f"Ground truth labels: {_labels_to_text(labels)}.",
+                labels=labels
             )
         )
 
@@ -378,6 +385,15 @@ def _configure_dspy_lm(dspy: Any, model: str, lm_spec: str | None = None, api_ba
     }
     if base:
         kwargs["api_base"] = base
+
+    # Reasoning-capable local models sometimes return huge reasoning_content and
+    # an empty final answer. These flags are harmless for providers that ignore
+    # them and help Ollama/Qwen-style models stay in final-answer mode.
+    if bool(getattr(cfg, "DSPY_DISABLE_THINKING", True)):
+        kwargs["think"] = False
+        kwargs["thinking"] = False
+        kwargs["extra_body"] = {"think": False}
+
     lm = dspy.LM(lm_name, **kwargs)
     dspy.configure(lm=lm)
     return lm
@@ -440,6 +456,15 @@ def _iter_predictor_like_objects(obj: Any) -> Iterable[Any]:
 
 def _extract_instructions(program: Any) -> str:
     chunks: List[str] = []
+    max_chars = int(getattr(cfg, "DSPY_EXTRACTED_INSTRUCTIONS_MAX_CHARS", 1200))
+    suspicious_markers = (
+        "here's a thinking process",
+        "reasoning_content",
+        "self-correction",
+        "output generation",
+        "adapterparseerror",
+        "expected to find output fields",
+    )
     for obj in _iter_predictor_like_objects(program):
         sig = getattr(obj, "signature", None)
         candidates = []
@@ -455,8 +480,14 @@ def _extract_instructions(program: Any) -> str:
         ])
         for candidate in candidates:
             text = str(candidate or "").strip()
-            if text and text not in chunks and len(text) < 4000:
-                chunks.append(text)
+            lower_text = text.lower()
+            if not text or text in chunks:
+                continue
+            if any(marker in lower_text for marker in suspicious_markers):
+                continue
+            if len(text) > max_chars:
+                text = text[: max_chars - 80].rstrip() + "\n[TRUNCATED extracted instruction to avoid prompt bloat]"
+            chunks.append(text)
     return "\n\n".join(chunks[:3]).strip()
 
 
@@ -510,9 +541,14 @@ def _build_guidance_text(modality: str, instructions: str, selected_examples: Li
 
     lines.append(
         "Use these optimized examples as calibration, but the current report text "
-        "and the hard labeling rules above remain authoritative."
+        "and the hard labeling rules above remain authoritative. Do not include "
+        "reasoning or analysis in the final answer unless config.py enables it."
     )
-    return "\n".join(lines).strip()
+    guidance = "\n".join(lines).strip()
+    max_chars = int(getattr(cfg, "DSPY_GUIDANCE_MAX_CHARS", 2500))
+    if max_chars > 0 and len(guidance) > max_chars:
+        guidance = guidance[: max_chars - 80].rstrip() + "\n[TRUNCATED DSPy guidance to avoid prompt bloat]"
+    return guidance
 
 
 def optimize_one_modality(
