@@ -561,8 +561,6 @@ def save_accuracy_report(path: Path, summary: Dict[str, Any]) -> None:
         f"Baseline accuracy: {pct(summary.get('baseline_accuracy'))} ({count(summary.get('baseline_accuracy'))})",
         f"Optimized accuracy: {pct(summary.get('optimized_accuracy'))} ({count(summary.get('optimized_accuracy'))})",
         "",
-        f"Gold labels hidden from DSPy examples: {summary.get('gold_labels_hidden_from_dspy_examples')}",
-        f"Instruction-only optimization: {summary.get('instruction_only_optimization')}",
         f"Max bootstrapped demos: {summary.get('max_bootstrapped_demos')}",
         f"Max labeled demos: {summary.get('max_labeled_demos')}",
     ]
