@@ -24,7 +24,7 @@ DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
 # DSPy needs enough room for local thinking models to finish the final structured answer.
-DSPY_MAX_TOKENS = 800
+DSPY_MAX_TOKENS = 1200
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Compatibility values for ollama_client.py for testing purposes
@@ -32,7 +32,7 @@ MODEL_NAME = DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 REQUEST_TIMEOUT_SECONDS = 600
 NUM_PREDICT = DSPY_MAX_TOKENS
-NUM_CTX = 8192
+NUM_CTX = DSPY_MAX_TOKENS
 OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
 BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
 
@@ -225,16 +225,11 @@ CTA-specific rules:
   unless your project rules say they qualify.
 
 Output rules:
-- Reasoning must be 1 sentence.
+- Do not explain step by step.
+- Do not write hidden analysis.
+- Reasoning must be exactly one short sentence.
 - Labels must be only comma-separated allowed labels.
-- No step-by-step reasoning.
-- No markdown.
-- No JSON unless DSPy requires it.
-- Do not include extra commentary before or after the answer.
-
-Your output must include:
-1. Reasoning: One brief sentence supporting the final labels.
-2. Labels: Comma-separated final labels using only allowed labels.
+- End immediately after the labels.
 """
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""

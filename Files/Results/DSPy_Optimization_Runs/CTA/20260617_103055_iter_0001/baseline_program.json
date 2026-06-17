@@ -1,0 +1,32 @@
+{
+  "predict.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Label acute stroke-related vascular territory from CTA report text.\n\nAllowed labels: NONE, RMCA, LMCA, RACA, LACA, RPCA, LPCA, RPICA, LPICA, BA, RVA, LVA, RICA, LICA, RCA, LCA.\n\nCTA-specific rules:\n- Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.\n- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,\n  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.\n- Use RCA/LCA only for common carotid or cervical carotid involvement.\n- Do not use RCA/LCA for carotid terminus.\n- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.\n- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.\n- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings\n  unless your project rules say they qualify.\n\nOutput rules:\n- Do not explain step by step.\n- Do not write hidden analysis.\n- Reasoning must be exactly one short sentence.\n- Labels must be only comma-separated allowed labels.\n- End immediately after the labels.",
+      "fields": [
+        {
+          "prefix": "Report Text:",
+          "description": "CTA report text."
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "Brief explanation supporting the final labels."
+        },
+        {
+          "prefix": "Labels:",
+          "description": "Comma-separated final labels using only ALLOWED_LABELS."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.10",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}
