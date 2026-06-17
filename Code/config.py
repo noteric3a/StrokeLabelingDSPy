@@ -20,12 +20,12 @@ from __future__ import annotations
 # DSPy / Ollama model settings
 # =============================================================================
 
-DSPY_MODEL = "ollama_chat/llama3.2:latest"
+DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
 # Keep DSPy model outputs short enough to be parseable.
 # If inspect_history still shows truncation, try a non-thinking model or a custom Ollama LM wrapper.
-DSPY_MAX_TOKENS = 1200
+DSPY_MAX_TOKENS = 20000
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Disable DSPy/LM response caches during optimization/evaluation so every
