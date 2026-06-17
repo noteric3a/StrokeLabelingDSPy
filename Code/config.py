@@ -24,7 +24,7 @@ DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TEMPERATURE = 0.2
 # DSPy needs enough room for local thinking models to finish the final structured answer.
-DSPY_MAX_TOKENS = 4096
+DSPY_MAX_TOKENS = 800
 DSPY_PROGRAM_DIR = "optimized_programs"
 
 # Compatibility values for ollama_client.py for testing purposes
