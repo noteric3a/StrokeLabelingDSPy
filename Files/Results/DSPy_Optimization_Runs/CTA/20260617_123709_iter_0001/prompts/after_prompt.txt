@@ -1,1 +1,0 @@
-Report Text should prompt the Language Model to extract information about acute stroke-related vascular territory from CTA report text, specifically focusing on the location of occlusive thrombus, stenosis, or hemodynamically significant narrowing in the intracranial circulation.
