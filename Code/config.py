@@ -1,156 +1,121 @@
 """
-Central settings for the stroke labeler.
-This assumes this folder structure:
+Central configuration for the DSPy stroke-labeling repository.
 
-Project/
-├── Code/
-│   ├── main.py
-│   ├── config.py
-│   └── ...
-└── Files/
-    ├── Filtered_Reports.xlsx
-    ├── Radiology_Reports_GroundTruth_Subset.xlsx
-    └── generated output files
+The goal of this file is to be the main place you edit project behavior:
+- model settings
+- file paths
+- input spreadsheet column names
+- allowed labels and aliases
+- confidence settings
+- DSPy program instructions
+- review/checker terms
+- converter/highlighting constants
+
+The other files should import these values instead of hard-coding project rules.
 """
 
-from pathlib import Path
+from __future__ import annotations
 
-# Folder paths
-CODE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = CODE_DIR.parent
-FILES_DIR = PROJECT_ROOT / "Files"
-FILES_DIR_DEBUG = PROJECT_ROOT / "Files" / "Debug"
-FINISHED_CASES_ROOT = FILES_DIR / "Finished_Cases"
-GROUND_TRUTH_DIR = FILES_DIR / "GT"
-REPORTS_DIR = FILES_DIR / "Report"
+# =============================================================================
+# DSPy / Ollama model settings
+# =============================================================================
 
-# Make sure all directories exist
-FILES_DIR.mkdir(exist_ok=True)
-FILES_DIR_DEBUG.mkdir(exist_ok=True)
-FINISHED_CASES_ROOT.mkdir(exist_ok=True)
-GROUND_TRUTH_DIR.mkdir(exist_ok=True)
-REPORTS_DIR.mkdir(exist_ok=True)
-
-MODEL_NAME = "qwen3.6:latest"
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
-# Input/output files
-INPUT_REPORTS_FILE = REPORTS_DIR / "New Reports.xlsx"
-GROUND_TRUTH_FILE = GROUND_TRUTH_DIR / "GroundTruthKeyNew.xlsx"
-OUTPUT_JSON_FILE = FILES_DIR / "labeled_cases.json"
-
-# ---------------------------------------------------------------------------
-# Run controls
-# ---------------------------------------------------------------------------
-# These config.py values are the defaults for normal runs. CLI flags in main.py
-# are only one-run overrides. You can run entirely from config.py by editing
-# these values and calling `python main.py`.
-
-# False: run the normal labeler pipeline.
-# True: run DSPy prompt optimization using the INPUT_REPORTS_FILE and
-# GROUND_TRUTH_FILE below, write OPTIMIZED_PROMPTS_FILE, then exit.
-RUN_PROMPT_OPTIMIZATION = False
-
-# True: compare the generated JSON to GROUND_TRUTH_FILE after labeling.
-# False: label and convert output without validation.
-RUN_VALIDATION_AFTER_LABELING = True
-
-# True: use the resumable ProcessingCache.
-# False: ignore the cache and reprocess all rows.
-USE_PROCESSING_CACHE = True
-
-# True: include *_reasoning fields in labeled_cases.json and the converted Excel file.
-# False: omit reasoning text from the final output JSON/Excel while still keeping
-# debug logs available in Files/finished_cases/<run>/Debug/.
-INCLUDE_REASONING_IN_JSON = True
-
-# True: ask the LLM to generate concise visible reasoning fields in label JSON.
-# False: remove label reasoning from the Ollama JSON schema and prompt examples.
-# This is the strongest setting for preventing long chain-of-thought /
-# reasoning_content from consuming the response budget or breaking JSON parsing.
-GENERATE_LABEL_REASONING = False
-
-# The CT sanitizer is separate from label generation. Keep this False if your
-# model tends to spill long reasoning into JSON responses.
-GENERATE_SANITIZER_REASONING = False
-
-
-# ---------------------------------------------------------------------------
-# DSPy prompt-optimization controls
-# ---------------------------------------------------------------------------
-# Normal labeling runs automatically insert the saved DSPy-optimized guidance
-# into the hand-written prompt templates when this flag is True and the file
-# exists.
-USE_OPTIMIZED_PROMPTS = True
-OPTIMIZED_PROMPTS_FILE = FILES_DIR / "optimized_prompts.json"
-# Alias used by the CLI help text and optimizer; keep the same value unless you
-# intentionally want a separate output path.
-DSPY_OPTIMIZED_PROMPTS_OUTPUT_FILE = OPTIMIZED_PROMPTS_FILE
-
-# Modalities to optimize when RUN_PROMPT_OPTIMIZATION=True or --optimize-prompts
-# is used. Valid values: CT, CTA, CTP, COMBINED.
-DSPY_MODALITIES = ["CT", "CTA", "CTP", "COMBINED"]
-
-# DSPy uses LiteLLM provider/model strings. For local Ollama, the default
-# `ollama_chat/<model>` works with the chat endpoint exposed by Ollama.
-DSPY_LM = f"ollama_chat/{MODEL_NAME}"
+DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
-# Use LabeledFewShot for the most stable local-Ollama optimization path.
-# MIPROv2 can still be used, but some local reasoning models may put their
-# instruction-proposal answer into reasoning_content instead of final JSON.
-DSPY_OPTIMIZER = "LabeledFewShot"  # MIPROv2, BootstrapFewShot, or LabeledFewShot
-DSPY_AUTO = "light"                # MIPROv2 search budget: light, medium, heavy
-DSPY_MAX_LABELED_DEMOS = 4
-DSPY_MAX_BOOTSTRAPPED_DEMOS = 0
-DSPY_NUM_THREADS = 1
-DSPY_SEED = 9
-DSPY_TRAIN_LIMIT = 60
-DSPY_VAL_LIMIT = 30
+DSPY_TEMPERATURE = 0.2
+# Keep DSPy model outputs short enough to be parseable.
+# If inspect_history still shows truncation, try a non-thinking model or a custom Ollama LM wrapper.
+DSPY_MAX_TOKENS = 1200
+DSPY_PROGRAM_DIR = "optimized_programs"
 
-# DSPy prompt-generation safety controls.
-DSPY_USE_CHAIN_OF_THOUGHT = False
-DSPY_DISABLE_THINKING = True
-DSPY_PROMPT_NO_THINK_DIRECTIVE = "/no_think"
-
-# Prevent an optimized prompt artifact from injecting a huge instruction or
-# accidental model reasoning dump into every production prompt.
-OPTIMIZED_PROMPT_MAX_CHARS = 2500
-DSPY_EXTRACTED_INSTRUCTIONS_MAX_CHARS = 1200
-DSPY_GUIDANCE_MAX_CHARS = 2500
-
-
-# Confidence checking controls
-# False: normal single deterministic run at temperature 0.
-# True: run each label prompt CONFIDENCE_RUNS times at CONFIDENCE_TEMPERATURE,
-# then use the most common answer as the final label and write possible answers
-# with vote percentages into the JSON.
-ENABLE_CONFIDENCE_CHECKING = False
-CONFIDENCE_RUNS = 10
-CONFIDENCE_TEMPERATURE = 0.2
-
-# Minimum vote percentage required for *_is_confident = True.
-# Leave blank ("") to use the default value from confidence.py.
-# Values below 51 are automatically raised to 51 so the winner must be a majority.
-MIN_CONFIDENCE_PERCENTAGE = "67"
-
-# Combined safety controls
-# True: if Combined_GT returns ["NONE"] even though CT_GT, CTA_GT, or CTP_GT
-# has a positive territory label, replace Combined_GT with the union of positive
-# modality labels and mark the case for review. This prevents the Combined step
-# from accidentally erasing already-established modality evidence.
-ENFORCE_COMBINED_POSITIVE_FALLBACK = True
-
-# Log/generated files
-RAW_OUTPUT_LOG = FILES_DIR_DEBUG / "raw_ollama_outputs_async.txt"
-OLLAMA_WRAPPER_LOG = FILES_DIR_DEBUG / "ollama_outputs_async.txt"
-BAD_JSON_LOG = FILES_DIR_DEBUG / "bad_json_outputs_async.txt"
-FAILED_CASES_LOG = FILES_DIR_DEBUG / "failed_cases_async.txt"
-
-# Ollama settings
-MAX_CONCURRENT_REQUESTS = 4
+# Compatibility values for ollama_client.py for testing purposes
+MODEL_NAME = DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
+OLLAMA_URL = "http://localhost:11434/api/generate"
 REQUEST_TIMEOUT_SECONDS = 600
-NUM_PREDICT = 1670
-NUM_CTX = 20000
+NUM_PREDICT = DSPY_MAX_TOKENS
+# Context window should be larger than output tokens because DSPy adds instructions/few-shot demos.
+NUM_CTX = 8192
+OLLAMA_WRAPPER_LOG = "Files/Logs/ollama_wrapper_log.jsonl"
+BAD_JSON_LOG = "Files/Logs/bad_json_log.jsonl"
+
+# DSPy training debug logs. When True, dspy_train.py writes inspect_history()
+# output for parse/truncation errors into the timestamped optimization folder.
+DSPY_SAVE_HISTORY_ON_ERROR = True
+DSPY_ERROR_HISTORY_SIZE = 3
+
+# When enabled, main.py writes each run into a unique timestamped folder.
+# Example: Files/Results/run_20260616_153012/labeled_cases_dspy.json
+USE_TIMESTAMPED_RUN_FOLDERS = True
+RUN_FOLDER_PREFIX = "run"
+
+
+# =============================================================================
+# File paths and run defaults
+# =============================================================================
+
+INPUT_REPORT_FILE = "Files/Report/New Reports.xlsx"
+# DSPy training can use a separate report-text workbook from the ground-truth key.
+# By default, use the same reports workbook as the main labeler.
+TRAINING_REPORTS_FILE = INPUT_REPORT_FILE
+OUTPUT_JSON_FILE = "Files/Results/labeled_cases_dspy.json"
+GROUND_TRUTH_FILE = "Files/GT/GroundTruthKeyNew.xlsx"
+TEXT_REPORT_FILE = "Files/Results/report_dspy.txt"
+JSON_REPORT_FILE = "Files/Results/report_dspy.json"
+CACHE_FILE = "Files/.processing_cache.json"
+
+MAX_CONCURRENT_CASES = 4
+LAZY_EXCEL_CHUNK_SIZE = 50
+
+
+# =============================================================================
+# Input spreadsheet column names
+# =============================================================================
+
+CASE_ID_COLUMNS = ["Case Name", "case_id", "Case ID", "ID", "Case_Name", "CASE_ID", "Case"]
+
+REPORT_COLUMN_CANDIDATES = {
+    "CT_Report": ["CT Report", "CT_Report", "CT text", "CT_Text", "CT"],
+    "CTA_Report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text", "CTA"],
+    "CTP_Report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text", "CTP"],
+    "MRI_Report": ["MRI Report", "MRI_Report", "MRI text", "MRI_Text", "MRI"],
+}
+
+TRAINING_COLUMN_CANDIDATES = {
+    "CT": {
+        "report": ["CT Report", "CT_Report", "CT text", "CT_Text", "CT"],
+        "ground_truth": ["CT GT", "CT_GT", "CT"],
+    },
+    "CTA": {
+        "report": ["CTA Report", "CTA_Report", "CTA text", "CTA_Text", "CTA"],
+        "ground_truth": ["CTA GT", "CTA_GT", "CTA"],
+    },
+    "CTP": {
+        "report": ["CTP Report", "CTP_Report", "CTP text", "CTP_Text", "CTP"],
+        "ground_truth": ["CTP GT", "CTP_GT", "CTP"],
+    },
+}
+
+
+# =============================================================================
+# Confidence checking
+# =============================================================================
+
+ENABLE_CONFIDENCE_CHECKING = False
+CONFIDENCE_ATTEMPTS = 10
+CONFIDENCE_THRESHOLD_PERCENTAGE = 51.0
+CONFIDENCE_REASONING_WINNING_LIMIT = 5
+CONFIDENCE_REASONING_ALTERNATE_LIMIT = 5
+ALTERNATE_REASONING_MARKER = "\n\nAlternate-label reasoning samples:"
+
+# Compatibility aliases used by confidence.py / review_checks.py.
+CONFIDENCE_RUNS = CONFIDENCE_ATTEMPTS
+CONFIDENCE_TEMPERATURE = DSPY_TEMPERATURE
+MIN_CONFIDENCE_PERCENTAGE = CONFIDENCE_THRESHOLD_PERCENTAGE
+
+
+# =============================================================================
+# Allowed labels and normalization aliases
+# =============================================================================
 
 ALLOWED_LABELS = [
     "NONE",
@@ -161,4 +126,343 @@ ALLOWED_LABELS = [
     "BA",
     "RVA", "LVA",
     "RICA", "LICA",
+    "RCA", "LCA",
 ]
+
+LABEL_ORDER = [
+    "NONE",
+    "RMCA", "LMCA",
+    "RACA", "LACA",
+    "RPCA", "LPCA",
+    "RPICA", "LPICA",
+    "BA",
+    "RVA", "LVA",
+    "RICA", "LICA",
+    "RCA", "LCA",
+]
+
+LABEL_ALIASES = {
+    "RIGHT MCA": "RMCA",
+    "LEFT MCA": "LMCA",
+    "RIGHT MIDDLE CEREBRAL": "RMCA",
+    "LEFT MIDDLE CEREBRAL": "LMCA",
+    "RIGHT ACA": "RACA",
+    "LEFT ACA": "LACA",
+    "RIGHT ANTERIOR CEREBRAL": "RACA",
+    "LEFT ANTERIOR CEREBRAL": "LACA",
+    "RIGHT PCA": "RPCA",
+    "LEFT PCA": "LPCA",
+    "RIGHT POSTERIOR CEREBRAL": "RPCA",
+    "LEFT POSTERIOR CEREBRAL": "LPCA",
+    "RIGHT PICA": "RPICA",
+    "LEFT PICA": "LPICA",
+    "BASILAR": "BA",
+    "BASILAR ARTERY": "BA",
+    "RIGHT VERTEBRAL": "RVA",
+    "LEFT VERTEBRAL": "LVA",
+    "RIGHT VERTEBRAL ARTERY": "RVA",
+    "LEFT VERTEBRAL ARTERY": "LVA",
+    "RIGHT ICA": "RICA",
+    "LEFT ICA": "LICA",
+    "RIGHT INTERNAL CAROTID": "RICA",
+    "LEFT INTERNAL CAROTID": "LICA",
+    "RIGHT COMMON CAROTID": "RCA",
+    "LEFT COMMON CAROTID": "LCA",
+    "NEGATIVE": "NONE",
+    "NORMAL": "NONE",
+    "NO ACUTE STROKE": "NONE",
+}
+
+
+# =============================================================================
+# DSPy signature descriptions and instructions
+# =============================================================================
+
+DSPY_INPUT_DESCRIPTIONS = {
+    "ct_report": "CT brain report text.",
+    "cta_report": "CTA report text.",
+    "ctp_report": "CT perfusion report text.",
+    "mri_report": "MRI report text if available.",
+    "ct_labels": "Already predicted CT labels.",
+    "cta_labels": "Already predicted CTA labels.",
+    "ctp_labels": "Already predicted CTP labels.",
+    "ct_reasoning": "CT reasoning.",
+    "cta_reasoning": "CTA reasoning.",
+    "ctp_reasoning": "CTP reasoning.",
+}
+
+DSPY_OUTPUT_DESCRIPTIONS = {
+    "labels": "Only comma-separated labels from the allowed list. Example: RMCA or NONE.",
+    "reasoning": "Exactly one short sentence. No step-by-step reasoning.",
+    "combined_reasoning": "Exactly one short sentence explaining the final combined labels.",
+}
+
+_ALLOWED_LABELS_TEXT = ", ".join(ALLOWED_LABELS)
+
+CT_SIGNATURE_INSTRUCTIONS = f"""
+Label acute ischemic stroke territory from CT brain report text only.
+
+Allowed labels: {_ALLOWED_LABELS_TEXT}.
+
+CT-specific rules:
+- Use NONE only when there is no qualifying acute ischemic stroke territory.
+- Do not include NONE with another label.
+- Do not use CTA or CTP findings when labeling CT.
+- CT-visible acute infarct signs should map to their arterial territory.
+- Basal ganglia, lentiform nucleus, putamen, caudate, internal capsule,
+  corona radiata, centrum semiovale, insula, and operculum usually map to MCA territory.
+- Do not label chronic infarcts, old encephalomalacia, stable findings,
+  artifacts, or nonspecific weak findings as acute stroke territories.
+
+Output rules:
+- Do not explain step by step.
+- Reasoning must be exactly one short sentence.
+- Labels must be only comma-separated allowed labels.
+- End immediately after the labels.
+"""
+
+CTA_SIGNATURE_INSTRUCTIONS = f"""
+/no_think
+Do not think step by step. Return only the final answer fields.
+
+Your goal is to label acute stroke-related vascular territory from CTA report text.
+
+Allowed labels: {_ALLOWED_LABELS_TEXT}.
+
+CTA-specific rules:
+- Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement.
+- Do not use RCA/LCA for carotid terminus.
+- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, or stable old findings
+  unless your project rules say they qualify.
+
+Output rules:
+- Do not explain step by step.
+- Do not write hidden analysis.
+- Reasoning must be exactly one short sentence.
+- Labels must be only comma-separated allowed labels.
+- End immediately after the labels.
+"""
+
+CTP_SIGNATURE_INSTRUCTIONS = f"""
+Label acute perfusion territory from CT perfusion report text.
+
+Allowed labels: {_ALLOWED_LABELS_TEXT}.
+
+CTP-specific rules:
+- Label the territory of qualifying hypoperfusion, infarct core, mismatch, penumbra, or tissue at risk.
+- Use NONE when there is no qualifying perfusion deficit.
+- Do not label tiny nonspecific artifacts or clearly non-territorial findings.
+- Prefer the tissue/perfusion territory over an upstream mechanism.
+- If RAPID/perfusion values say core and hypoperfusion are 0 mL, usually use NONE.
+
+Output rules:
+- Do not explain step by step.
+- Reasoning must be exactly one short sentence.
+- Labels must be only comma-separated allowed labels.
+- End immediately after the labels.
+"""
+
+COMBINED_SIGNATURE_INSTRUCTIONS = f"""
+Produce final combined acute stroke territory labels from modality labels and reports.
+
+Allowed labels: {_ALLOWED_LABELS_TEXT}.
+
+Combined-specific rules:
+- Start from CT_GT, CTA_GT, and CTP_GT.
+- Add MRI acute/recent infarct territories when present.
+- Remove labels only for clear reasons such as chronic/stable finding, artifact, weak nonspecific CT sign,
+  isolated upstream ICA when a more specific downstream tissue territory is identified, non-qualifying mild stenosis,
+  or mismatch/perfusion finding that is too small or nonspecific.
+- Prefer tissue/perfusion territory over upstream mechanism when they conflict.
+- Use NONE only when no final acute stroke territory remains.
+- Do not include NONE with any positive territory label.
+"""
+
+DSPY_PROGRAM_NAMES = {
+    "CT": "ct_labeler",
+    "CTA": "cta_labeler",
+    "CTP": "ctp_labeler",
+    "Combined": "combined_labeler",
+}
+
+# =============================================================================
+# Excel prompt display settings
+# =============================================================================
+# When True, convert.py appends prompt/instruction columns to the final Excel
+# sheet.  These are copied from the active config.py instructions at conversion
+# time, so the spreadsheet records exactly what prompt rules were used for the
+# run even if the JSON did not store prompt text per case.
+INCLUDE_CURRENT_PROMPT_COLUMNS = True
+
+# Each key becomes an Excel column header.  Each value is repeated on every row.
+# This is intentional: filtering any case row still preserves the prompt context
+# used for that output.  Set INCLUDE_CURRENT_PROMPT_COLUMNS = False if the sheet
+# becomes too large.
+CURRENT_PROMPT_COLUMNS = {
+    "CT Current Prompt": CT_SIGNATURE_INSTRUCTIONS,
+    "CTA Current Prompt": CTA_SIGNATURE_INSTRUCTIONS,
+    "CTP Current Prompt": CTP_SIGNATURE_INSTRUCTIONS,
+    "Combined Current Prompt": COMBINED_SIGNATURE_INSTRUCTIONS,
+}
+
+
+# =============================================================================
+# Deterministic review/checker constants
+# =============================================================================
+
+REVIEW_VERSION = "reasoning-label-consistency-v9-bilateral-side-fix"
+
+EXCLUSION_PHRASES = (
+    "does not qualify", "do not qualify", "not qualify", "non-qualifying", "not enough",
+    "insufficient", "excluded", "exclude", "omitted", "omit", "removed", "remove",
+    "dropped", "drop", "should not be labeled", "should not be included", "not labeled",
+    "not included", "ruled out",
+)
+
+POSITIVE_REASONING_PHRASES = (
+    "qualifies for", "warrants", "is labeled", "are labeled", "should be labeled",
+    "therefore label", "therefore, label", "output",
+)
+
+CT_CONTAMINATION_TERMS = (
+    "cta", "ct angiogram", "ct angiography", "ctp", "ct perfusion", "tmax", "cbf", "cbv",
+    "mismatch", "hypoperfusion", "penumbra", "tissue at risk", "rapid",
+)
+
+SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS = (
+    "subdural hematoma", "subdural haemorrhage", "subdural hemorrhage", "subdural blood",
+    "subdural collection", "acute subdural", "sdh", "extra-axial hematoma",
+    "extra-axial haemorrhage", "extra-axial hemorrhage", "extra-axial blood",
+    "extraaxial hematoma", "extraaxial hemorrhage",
+)
+
+SUBARACHNOID_REVIEW_TERMS = (
+    "subarachnoid hemorrhage", "subarachnoid haemorrhage", "subarachnoid blood", "sah",
+)
+
+SUBDURAL_SCAN_FIELDS = (
+    ("CT_Report", "CT report"),
+    ("New_CT_Report", "sanitized CT report"),
+    ("MRI_Report", "MRI report"),
+    ("CTA_Report", "CTA brain-window text"),
+    ("CTP_Report", "CTP context text"),
+)
+
+SUBDURAL_SCAN_COLUMNS = SUBDURAL_SCAN_FIELDS
+
+LABEL_VARIANTS = {
+    "RMCA": ["rmca", "right mca", "right middle cerebral", "right m1", "right m2", "right m3", "right m4"],
+    "LMCA": ["lmca", "left mca", "left middle cerebral", "left m1", "left m2", "left m3", "left m4"],
+    "RACA": ["raca", "right aca", "right anterior cerebral", "right a1", "right a2", "right a3"],
+    "LACA": ["laca", "left aca", "left anterior cerebral", "left a1", "left a2", "left a3"],
+    "RPCA": ["rpca", "right pca", "right posterior cerebral", "right p1", "right p2", "right p3", "right p4"],
+    "LPCA": ["lpca", "left pca", "left posterior cerebral", "left p1", "left p2", "left p3", "left p4"],
+    "RPICA": ["rpica", "right pica", "right posterior inferior cerebellar", "right inferior cerebellar"],
+    "LPICA": ["lpica", "left pica", "left posterior inferior cerebellar", "left inferior cerebellar"],
+    "BA": ["ba", "basilar", "basilar artery", "basilar tip", "basilar trunk", "pons", "pontine", "central pons", "paramedian pons"],
+    "RVA": ["rva", "right vertebral", "right vertebral artery", "right v1", "right v2", "right v3", "right v4", "right intradural vertebral"],
+    "LVA": ["lva", "left vertebral", "left vertebral artery", "left v1", "left v2", "left v3", "left v4", "left intradural vertebral"],
+    "RICA": ["rica", "right ica", "right internal carotid", "right carotid terminus", "right intracranial carotid"],
+    "LICA": ["lica", "left ica", "left internal carotid", "left carotid terminus", "left intracranial carotid"],
+    "RCA": ["rca", "right common carotid", "right cca", "right cervical carotid"],
+    "LCA": ["lca", "left common carotid", "left cca", "left cervical carotid"],
+    "NONE": ["none", "no qualifying", "no evidence", "negative"],
+}
+
+TERRITORY_TERMS = {
+    "MCA": ["mca", "middle cerebral", "m1", "m2", "m3", "m4", "insula", "insular", "operculum", "basal ganglia", "lentiform", "putamen", "caudate", "internal capsule", "corona radiata", "centrum semiovale"],
+    "ACA": ["aca", "anterior cerebral", "a1", "a2", "a3", "pericallosal", "callosomarginal", "medial frontal", "medial parietal", "parafalcine", "cingulate", "corpus callosum"],
+    "PCA": ["pca", "posterior cerebral", "p1", "p2", "p3", "p4", "occipital", "calcarine", "posterior temporal", "thalamus", "thalamic"],
+    "PICA": ["pica", "posterior inferior cerebellar", "inferior cerebellar", "cerebellar hemisphere", "cerebellum"],
+    "BA": ["ba", "basilar", "basilar artery", "basilar tip", "basilar trunk", "pons", "pontine", "central pons", "paramedian pons", "brainstem"],
+    "VA": ["vertebral", "vertebral artery", "v1", "v2", "v3", "v4", "intradural vertebral", "vertebrobasilar junction"],
+    "ICA": ["ica", "internal carotid", "carotid terminus", "intracranial carotid", "petrous", "cavernous", "paraclinoid", "supraclinoid"],
+    "CA": ["common carotid", "cca", "cervical carotid"],
+}
+
+LABEL_SIDE_TERRITORY = {
+    "RMCA": ("right", "MCA"), "LMCA": ("left", "MCA"),
+    "RACA": ("right", "ACA"), "LACA": ("left", "ACA"),
+    "RPCA": ("right", "PCA"), "LPCA": ("left", "PCA"),
+    "RPICA": ("right", "PICA"), "LPICA": ("left", "PICA"),
+    "RVA": ("right", "VA"), "LVA": ("left", "VA"),
+    "RICA": ("right", "ICA"), "LICA": ("left", "ICA"),
+    "RCA": ("right", "CA"), "LCA": ("left", "CA"),
+}
+
+FIELD_REASONING_PAIRS = [
+    ("CT_Original_GT", "CT_Original_GT_reasoning", "CT original"),
+    ("CT_GT", "CT_GT_reasoning", "CT"),
+    ("CTA_GT", "CTA_GT_reasoning", "CTA"),
+    ("CTP_GT", "CTP_GT_reasoning", "CTP"),
+    ("Combined_GT", "CT_Combined_GT_reasoning", "Combined"),
+]
+
+CONFIDENCE_FIELDS = [
+    ("CT_Original_GT", "CT original"),
+    ("CT_GT", "CT"),
+    ("CTA_GT", "CTA"),
+    ("CTP_GT", "CTP"),
+    ("Combined_GT", "Combined"),
+]
+
+
+# =============================================================================
+# Converter / spreadsheet constants
+# =============================================================================
+
+ANSWER_KEY_CONFIG_FIELD = "GROUND_TRUTH_FILE"
+CASE_ID_COLUMN_CANDIDATES = tuple(CASE_ID_COLUMNS)
+
+MODALITY_COLUMN_CANDIDATES = {
+    "CT": {
+        "prediction": ("CT_GT", "CT GT", "CT_label", "CT Label", "CT_result", "CT Result", "CT"),
+        "ground_truth": ("CT GT", "CT_GT", "CT.GT", "CTGT", "CT Ground Truth", "CT_Ground_Truth", "CT"),
+    },
+    "CTA": {
+        "prediction": ("CTA_GT", "CTA GT", "CTA_label", "CTA Label", "CTA_result", "CTA Result", "CTA"),
+        "ground_truth": ("CTA GT", "CTA_GT", "CTA.GT", "CTAGT", "CTA Ground Truth", "CTA_Ground_Truth", "CTA"),
+    },
+    "CTP": {
+        "prediction": ("CTP_GT", "CTP GT", "CTP_label", "CTP Label", "CTP_result", "CTP Result", "CTP"),
+        "ground_truth": ("CTP GT", "CTP_GT", "CTP.GT", "CTPGT", "CTP Ground Truth", "CTP_Ground_Truth", "CTP"),
+    },
+    "Combined": {
+        "prediction": ("Combined_GT", "Combined GT", "Combined_label", "Combined Label", "Combined_result", "Combined Result", "Combined"),
+        "ground_truth": ("Combined GT", "Combined_GT", "Combined.GT", "CombinedGT", "Combined Ground Truth", "Combined_Ground_Truth", "Combined"),
+    },
+}
+
+REPORT_LIKE_TERMS = (
+    "EXAMINATION:", "EXAM:", "FINDINGS:", "IMPRESSION:", "TECHNIQUE:",
+    "CLINICAL HISTORY", "COMPARISON:", "CT STROKE BRAIN", "CT ANGIO", "CT PERFUSION",
+)
+
+NONE_ALIASES = {
+    "NONE", "NEGATIVE", "NORMAL", "NOACUTE", "NOACUTEFINDING", "NOACUTEFINDINGS",
+    "NOACUTESTROKE", "NOACUTEINFARCT", "NOACUTEINFARCTION", "NOLABEL", "NOLABELS",
+}
+BLANK_ALIASES = {"", "NAN", "NULL", "NONE_"}
+FALLBACK_ALLOWED_LABELS = set(ALLOWED_LABELS)
+LABEL_COLUMNS = ("CT_Original_GT", "CT_GT", "CTA_GT", "CTP_GT", "Combined_GT")
+RAW_REPORT_COLUMNS_TO_DROP_AFTER_MERGE = ("CT_Report", "CTA_Report", "CTP_Report", "MRI_Report")
+
+CONFIDENCE_THRESHOLD_SUFFIX = "_confidence_threshold"
+CONFIDENCE_VOTE_COUNT_SUFFIX = "_confidence_vote_count"
+CONFIDENCE_TOTAL_VOTES_SUFFIX = "_confidence_total_votes"
+CONFIDENCE_FINAL_LABEL_SUFFIX = "_final_label"
+CONFIDENCE_VOTES_SUFFIX = "_confidence_votes"
+
+REVIEW_TARGET_COLUMNS = {
+    "CT_Original_GT": ("CT_Original_GT", "CT Original Report/Reasoning"),
+    "CT_GT": ("CT_GT", "CT Report/Reasoning"),
+    "CTA_GT": ("CTA_GT", "CTA Report/Reasoning"),
+    "CTP_GT": ("CTP_GT", "CTP Report/Reasoning"),
+    "Combined_GT": ("Combined_GT", "Combined Report/Reasoning"),
+}
+REVIEW_FLAG_COLUMNS = ("Review_Flags_Red", "Review_Flags_Yellow", "Review_Flags")

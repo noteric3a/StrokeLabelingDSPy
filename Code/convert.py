@@ -10,96 +10,27 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+import config as cfg
 
-# config.py field used by the rest of the stroke-labeling project.
-ANSWER_KEY_CONFIG_FIELD = "GROUND_TRUTH_FILE"
 
-CASE_ID_COLUMN_CANDIDATES = (
-    "case_id",
-    "Case ID",
-    "Case Name",
-    "Case_Name",
-    "case name",
-    "CASE_ID",
-    "Case",
-)
-
-# Prediction columns are checked in the converted JSON output.
-# Ground-truth columns are checked in the answer-key spreadsheet.
-#
-# IMPORTANT:
-# Prefer *_GT / label-style prediction columns BEFORE raw modality names like
-# "CT", "CTA", or "CTP". In some files, raw "CT" is the report text, not the
-# predicted CT label. Choosing the report text column is the main reason too
-# many rows get highlighted as wrong.
-MODALITY_COLUMN_CANDIDATES = {
-    "CT": {
-        "prediction": ("CT_GT", "CT GT", "CT_label", "CT Label", "CT_result", "CT Result", "CT"),
-        "ground_truth": ("CT GT", "CT_GT", "CT.GT", "CTGT", "CT Ground Truth", "CT_Ground_Truth", "CT"),
-    },
-    "CTA": {
-        "prediction": ("CTA_GT", "CTA GT", "CTA_label", "CTA Label", "CTA_result", "CTA Result", "CTA"),
-        "ground_truth": ("CTA GT", "CTA_GT", "CTA.GT", "CTAGT", "CTA Ground Truth", "CTA_Ground_Truth", "CTA"),
-    },
-    "CTP": {
-        "prediction": ("CTP_GT", "CTP GT", "CTP_label", "CTP Label", "CTP_result", "CTP Result", "CTP"),
-        "ground_truth": ("CTP GT", "CTP_GT", "CTP.GT", "CTPGT", "CTP Ground Truth", "CTP_Ground_Truth", "CTP"),
-    },
-    "Combined": {
-        "prediction": (
-            "Combined_GT",
-            "Combined GT",
-            "Combined_label",
-            "Combined Label",
-            "Combined_result",
-            "Combined Result",
-            "Combined",
-        ),
-        "ground_truth": (
-            "Combined GT",
-            "Combined_GT",
-            "Combined.GT",
-            "CombinedGT",
-            "Combined Ground Truth",
-            "Combined_Ground_Truth",
-            "Combined",
-        ),
-    },
-}
-
-REPORT_LIKE_TERMS = (
-    "EXAMINATION:",
-    "EXAM:",
-    "FINDINGS:",
-    "IMPRESSION:",
-    "TECHNIQUE:",
-    "CLINICAL HISTORY",
-    "COMPARISON:",
-    "CT STROKE BRAIN",
-    "CT ANGIO",
-    "CT PERFUSION",
-)
-
-NONE_ALIASES = {
-    "NONE",
-    "NEGATIVE",
-    "NORMAL",
-    "NOACUTE",
-    "NOACUTEFINDING",
-    "NOACUTEFINDINGS",
-    "NOACUTESTROKE",
-    "NOACUTEINFARCT",
-    "NOACUTEINFARCTION",
-    "NOLABEL",
-    "NOLABELS",
-}
-
-BLANK_ALIASES = {"", "NAN", "NULL", "NONE_"}
-
+# Most converter constants are centralized in config.py.
+ANSWER_KEY_CONFIG_FIELD = cfg.ANSWER_KEY_CONFIG_FIELD
+CASE_ID_COLUMN_CANDIDATES = cfg.CASE_ID_COLUMN_CANDIDATES
+MODALITY_COLUMN_CANDIDATES = cfg.MODALITY_COLUMN_CANDIDATES
+REPORT_LIKE_TERMS = cfg.REPORT_LIKE_TERMS
+NONE_ALIASES = cfg.NONE_ALIASES
+BLANK_ALIASES = cfg.BLANK_ALIASES
+RAW_REPORT_COLUMNS_TO_DROP_AFTER_MERGE = cfg.RAW_REPORT_COLUMNS_TO_DROP_AFTER_MERGE
+CONFIDENCE_THRESHOLD_SUFFIX = cfg.CONFIDENCE_THRESHOLD_SUFFIX
+CONFIDENCE_VOTE_COUNT_SUFFIX = cfg.CONFIDENCE_VOTE_COUNT_SUFFIX
+CONFIDENCE_TOTAL_VOTES_SUFFIX = cfg.CONFIDENCE_TOTAL_VOTES_SUFFIX
+CONFIDENCE_FINAL_LABEL_SUFFIX = cfg.CONFIDENCE_FINAL_LABEL_SUFFIX
+CONFIDENCE_VOTES_SUFFIX = cfg.CONFIDENCE_VOTES_SUFFIX
+REVIEW_TARGET_COLUMNS = cfg.REVIEW_TARGET_COLUMNS
+REVIEW_FLAG_COLUMNS = cfg.REVIEW_FLAG_COLUMNS
 
 # Review highlighting is intentionally separated into a small helper file so
-# answer-key comparison code stays focused on red mismatch highlighting.  Newer
-# spreadsheet_debug_checks.py can split review flags into red/yellow priority.
+# answer-key comparison code stays focused on red mismatch highlighting.
 try:
     from spreadsheet_debug_checks import (
         find_review_excel_rows_by_severity,
@@ -111,7 +42,6 @@ except Exception:  # pragma: no cover - keep convert.py usable without helper fi
 
     def find_review_excel_rows_by_severity(output_df: pd.DataFrame) -> dict[str, dict[int, list[str]]]:
         return {"red": {}, "yellow": find_strange_excel_rows_with_reasons(output_df)}
-
 
 # ---------------------------------------------------------------------------
 # Compatibility helpers
@@ -663,6 +593,41 @@ def _format_report_reasoning_columns(output_df: pd.DataFrame) -> pd.DataFrame:
     return display_df
 
 
+def _format_current_prompt_columns_for_display(output_df: pd.DataFrame) -> pd.DataFrame:
+    """Append active prompt/instruction columns to the Excel display DataFrame.
+
+    The DSPy version does not always store a literal prompt in each JSON case.
+    Instead, the active task instructions live in config.py as
+    CT_SIGNATURE_INSTRUCTIONS, CTA_SIGNATURE_INSTRUCTIONS, CTP_SIGNATURE_INSTRUCTIONS,
+    and COMBINED_SIGNATURE_INSTRUCTIONS.  This function copies those active
+    config prompts into the final spreadsheet so every output file records the
+    prompt/instruction context used for the run.
+    """
+    display_df = output_df.copy()
+
+    if not bool(getattr(cfg, "INCLUDE_CURRENT_PROMPT_COLUMNS", False)):
+        return display_df
+
+    prompt_columns = getattr(cfg, "CURRENT_PROMPT_COLUMNS", {})
+    if not isinstance(prompt_columns, dict) or not prompt_columns:
+        return display_df
+
+    for column_name, prompt_text in prompt_columns.items():
+        column_name = str(column_name).strip()
+        if not column_name:
+            continue
+
+        # Clean prompt text for spreadsheet display but do not treat "NONE" as
+        # blank here because a prompt may legitimately mention the NONE label.
+        prompt = "" if prompt_text is None else str(prompt_text).strip()
+        if column_name in display_df.columns:
+            display_df[column_name] = prompt
+        else:
+            display_df[column_name] = prompt
+
+    return display_df
+
+
 # ---------------------------------------------------------------------------
 # Cell-level review highlighting helpers
 # ---------------------------------------------------------------------------
@@ -1084,7 +1049,7 @@ def style_excel_sheet(
     report_reasoning_col_indexes = {
         col_idx
         for header, col_idx in header_to_col.items()
-        if "Report/Reasoning" in header
+        if "Report/Reasoning" in header or "Current Prompt" in header
     }
 
     def column_name_map_to_indexes(cells_by_row: dict[int, set[str]]) -> dict[int, set[int]]:
@@ -1176,8 +1141,8 @@ def style_excel_sheet(
             except Exception:
                 pass
 
-        # Set width with some padding. Report/Reasoning columns are intentionally
-        # wider because they contain the report text followed by model reasoning.
+        # Set width with some padding. Report/Reasoning and Current Prompt columns are intentionally
+        # wider because they contain long report/reasoning or prompt text.
         if col_idx in report_reasoning_col_indexes:
             adjusted_width = 90
         else:
@@ -1252,6 +1217,7 @@ def convert(
     # merge vote_count + total_votes into one n/total column.
     display_base_df = _format_confidence_columns_for_display(df)
     display_df = _format_report_reasoning_columns(display_base_df)
+    display_df = _format_current_prompt_columns_for_display(display_df)
 
     if out_path is None:
         out = src.with_suffix(".xlsx") if fmt == "xlsx" else src.with_suffix(".csv")

@@ -17,6 +17,7 @@ import pandas as pd
 from utils import normalize_labels
 from convert import convert
 from lazy_excel import LazyExcelReader
+import config as cfg
 
 def normalize_gt(label_str: Any) -> set:
     """Normalize a ground truth label string into a set of uppercase labels."""
@@ -80,8 +81,8 @@ def _process_case_comparison(gen_case: Dict[str, Any], gt_case: Dict[str, Any] |
 def check_answers(
     json_file: str,
     ground_truth_file: str,
-    report_path: str = "Files/report.txt",
-    json_report_path: str = "Files/report.json",
+    report_path: str = cfg.TEXT_REPORT_FILE,
+    json_report_path: str = cfg.JSON_REPORT_FILE,
 ) -> Dict[str, Any]:
     """Load generated data and ground truth, compare them case-by-case, and generate reports."""
 
@@ -137,7 +138,7 @@ def check_answers(
 
     # Read the ground truth spreadsheet lazily to minimize memory usage.
     try:
-        reader = LazyExcelReader(ground_truth_file, chunk_size=50)
+        reader = LazyExcelReader(ground_truth_file, chunk_size=cfg.LAZY_EXCEL_CHUNK_SIZE)
         print(f"Reading ground truth file in chunks ({reader.get_stats()})")
     except Exception as e:
         print(f"⚠️ Failed to initialize lazy reader: {e}, falling back to standard read")

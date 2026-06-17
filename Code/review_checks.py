@@ -10,201 +10,26 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Sequence, Set
 
-from config import ALLOWED_LABELS
+import config as cfg
 from utils import normalize_labels
 from confidence import min_confidence_percentage
 
-
-LABEL_ORDER = [
-    "NONE",
-    "RMCA", "LMCA",
-    "RACA", "LACA",
-    "RPCA", "LPCA",
-    "RPICA", "LPICA",
-    "BA",
-    "RVA", "LVA",
-    "RICA", "LICA",
-    "RCA", "LCA",
-]
-
-REVIEW_VERSION = "reasoning-label-consistency-v9-bilateral-side-fix"
-
-# Phrases that commonly mean the reasoning rejected a finding/label.
-EXCLUSION_PHRASES = (
-    "does not qualify",
-    "do not qualify",
-    "not qualify",
-    "non-qualifying",
-    "not enough",
-    "insufficient",
-    "excluded",
-    "exclude",
-    "omitted",
-    "omit",
-    "removed",
-    "remove",
-    "dropped",
-    "drop",
-    "should not be labeled",
-    "should not be included",
-    "not labeled",
-    "not included",
-    "ruled out",
-)
-
-# Keep this intentionally narrow to avoid flagging legitimate NONE reasoning that
-# mentions a non-qualifying finding, e.g. "right MCA stenosis does not qualify."
-POSITIVE_REASONING_PHRASES = (
-    "qualifies for",
-    "warrants",
-    "is labeled",
-    "are labeled",
-    "should be labeled",
-    "therefore label",
-    "therefore, label",
-    "output",
-)
-
-CT_CONTAMINATION_TERMS = (
-    "cta",
-    "ct angiogram",
-    "ct angiography",
-    "ctp",
-    "ct perfusion",
-    "tmax",
-    "cbf",
-    "cbv",
-    "mismatch",
-    "hypoperfusion",
-    "penumbra",
-    "tissue at risk",
-    "rapid",
-)
+ALLOWED_LABELS = cfg.ALLOWED_LABELS
 
 
-# Cases with subdural / extra-axial hemorrhage are high-risk for false
-# ischemic territory labels.  In these cases, subtle adjacent hypodensity may
-# represent hemorrhage/trauma-related edema or contusion rather than an acute
-# arterial infarct.  These terms trigger manual review; they do not change the
-# model's labels by themselves.
-SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS = (
-    "subdural hematoma",
-    "subdural haemorrhage",
-    "subdural hemorrhage",
-    "subdural blood",
-    "subdural collection",
-    "acute subdural",
-    "sdh",
-    "extra-axial hematoma",
-    "extra-axial haemorrhage",
-    "extra-axial hemorrhage",
-    "extra-axial blood",
-    "extraaxial hematoma",
-    "extraaxial hemorrhage",
-)
-
-SUBARACHNOID_REVIEW_TERMS = (
-    "subarachnoid hemorrhage",
-    "subarachnoid haemorrhage",
-    "subarachnoid blood",
-    "sah",
-)
-
-SUBDURAL_SCAN_FIELDS = (
-    ("CT_Report", "CT report"),
-    ("New_CT_Report", "sanitized CT report"),
-    ("MRI_Report", "MRI report"),
-    ("CTA_Report", "CTA brain-window text"),
-    ("CTP_Report", "CTP context text"),
-)
-
-LABEL_VARIANTS = {
-    "RMCA": ["rmca", "right mca", "right middle cerebral", "right m1", "right m2", "right m3", "right m4"],
-    "LMCA": ["lmca", "left mca", "left middle cerebral", "left m1", "left m2", "left m3", "left m4"],
-    "RACA": ["raca", "right aca", "right anterior cerebral", "right a1", "right a2", "right a3"],
-    "LACA": ["laca", "left aca", "left anterior cerebral", "left a1", "left a2", "left a3"],
-    "RPCA": ["rpca", "right pca", "right posterior cerebral", "right p1", "right p2", "right p3", "right p4"],
-    "LPCA": ["lpca", "left pca", "left posterior cerebral", "left p1", "left p2", "left p3", "left p4"],
-    "RPICA": ["rpica", "right pica", "right posterior inferior cerebellar", "right inferior cerebellar"],
-    "LPICA": ["lpica", "left pica", "left posterior inferior cerebellar", "left inferior cerebellar"],
-    "BA": ["ba", "basilar", "basilar artery", "basilar tip", "basilar trunk", "pons", "pontine", "central pons", "paramedian pons"],
-    "RVA": ["rva", "right vertebral", "right vertebral artery", "right v1", "right v2", "right v3", "right v4", "right intradural vertebral"],
-    "LVA": ["lva", "left vertebral", "left vertebral artery", "left v1", "left v2", "left v3", "left v4", "left intradural vertebral"],
-    "RICA": ["rica", "right ica", "right internal carotid", "right carotid terminus", "right intracranial carotid"],
-    "LICA": ["lica", "left ica", "left internal carotid", "left carotid terminus", "left intracranial carotid"],
-    "RCA": ["rca", "right common carotid", "right cca", "right cervical carotid"],
-    "LCA": ["lca", "left common carotid", "left cca", "left cervical carotid"],
-    "NONE": ["none", "no qualifying", "no evidence", "negative"],
-}
-
-TERRITORY_TERMS = {
-    "MCA": [
-        "mca", "middle cerebral", "m1", "m2", "m3", "m4",
-        "insula", "insular", "operculum", "basal ganglia", "lentiform",
-        "putamen", "caudate", "internal capsule", "corona radiata",
-        "centrum semiovale",
-    ],
-    "ACA": [
-        "aca", "anterior cerebral", "a1", "a2", "a3", "pericallosal",
-        "callosomarginal", "medial frontal", "medial parietal", "parafalcine",
-        "cingulate", "corpus callosum",
-    ],
-    "PCA": [
-        "pca", "posterior cerebral", "p1", "p2", "p3", "p4",
-        "occipital", "calcarine", "posterior temporal", "thalamus", "thalamic",
-    ],
-    "PICA": [
-        "pica", "posterior inferior cerebellar", "inferior cerebellar",
-        "cerebellar hemisphere", "cerebellum",
-    ],
-    "BA": [
-        "ba", "basilar", "basilar artery", "basilar tip", "basilar trunk",
-        "pons", "pontine", "central pons", "paramedian pons", "brainstem",
-    ],
-    "VA": [
-        "vertebral", "vertebral artery", "v1", "v2", "v3", "v4",
-        "intradural vertebral", "vertebrobasilar junction",
-    ],
-    "ICA": [
-        "ica", "internal carotid", "carotid terminus", "intracranial carotid",
-        "petrous", "cavernous", "paraclinoid", "supraclinoid",
-    ],
-    "CA": ["common carotid", "cca", "cervical carotid"],
-}
-
-LABEL_SIDE_TERRITORY = {
-    "RMCA": ("right", "MCA"),
-    "LMCA": ("left", "MCA"),
-    "RACA": ("right", "ACA"),
-    "LACA": ("left", "ACA"),
-    "RPCA": ("right", "PCA"),
-    "LPCA": ("left", "PCA"),
-    "RPICA": ("right", "PICA"),
-    "LPICA": ("left", "PICA"),
-    "RVA": ("right", "VA"),
-    "LVA": ("left", "VA"),
-    "RICA": ("right", "ICA"),
-    "LICA": ("left", "ICA"),
-    "RCA": ("right", "CA"),
-    "LCA": ("left", "CA"),
-}
-
-FIELD_REASONING_PAIRS = [
-    ("CT_Original_GT", "CT_Original_GT_reasoning", "CT original"),
-    ("CT_GT", "CT_GT_reasoning", "CT"),
-    ("CTA_GT", "CTA_GT_reasoning", "CTA"),
-    ("CTP_GT", "CTP_GT_reasoning", "CTP"),
-    ("Combined_GT", "CT_Combined_GT_reasoning", "Combined"),
-]
-
-CONFIDENCE_FIELDS = [
-    ("CT_Original_GT", "CT original"),
-    ("CT_GT", "CT"),
-    ("CTA_GT", "CTA"),
-    ("CTP_GT", "CTP"),
-    ("Combined_GT", "Combined"),
-]
-
+LABEL_ORDER = cfg.LABEL_ORDER
+REVIEW_VERSION = cfg.REVIEW_VERSION
+EXCLUSION_PHRASES = cfg.EXCLUSION_PHRASES
+POSITIVE_REASONING_PHRASES = cfg.POSITIVE_REASONING_PHRASES
+CT_CONTAMINATION_TERMS = cfg.CT_CONTAMINATION_TERMS
+SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS = cfg.SUBDURAL_EXTRA_AXIAL_REVIEW_TERMS
+SUBARACHNOID_REVIEW_TERMS = cfg.SUBARACHNOID_REVIEW_TERMS
+SUBDURAL_SCAN_FIELDS = cfg.SUBDURAL_SCAN_FIELDS
+LABEL_VARIANTS = cfg.LABEL_VARIANTS
+TERRITORY_TERMS = cfg.TERRITORY_TERMS
+LABEL_SIDE_TERRITORY = cfg.LABEL_SIDE_TERRITORY
+FIELD_REASONING_PAIRS = cfg.FIELD_REASONING_PAIRS
+CONFIDENCE_FIELDS = cfg.CONFIDENCE_FIELDS
 
 def _compact_text(value: Any) -> str:
     text = str(value or "").lower()
