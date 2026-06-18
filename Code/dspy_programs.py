@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
+import hashlib
 import json
+import math
 import re
 
 import dspy
@@ -32,12 +36,43 @@ OUTPUT_DESCRIPTIONS = {
 }
 
 
-def effective_cta_prompt() -> str:
-    """Return the exact CTA instruction/rule combination used at inference."""
+def _program_signature_instructions(program: Any) -> str:
+    """Return the currently loaded/optimized instruction for one DSPy program."""
+    for attrs in (("predict", "signature", "instructions"), ("signature", "instructions")):
+        value = program
+        try:
+            for attr in attrs:
+                value = getattr(value, attr)
+            if value:
+                return str(value)
+        except Exception:
+            continue
+    return ""
+
+
+def current_cta_supplement(program: Any | None = None) -> str:
+    """Return the active CTA supplement, falling back to the config seed."""
+    if program is not None:
+        optimized = _program_signature_instructions(program).strip()
+        if optimized:
+            return optimized
+
+    loaded = _PROGRAMS.get("cta") if "_PROGRAMS" in globals() else None
+    if loaded is not None:
+        optimized = _program_signature_instructions(loaded).strip()
+        if optimized:
+            return optimized
+    return cfg.CTA_SIGNATURE_INSTRUCTIONS.strip()
+
+
+def effective_cta_prompt(supplement: str | None = None) -> str:
+    """Return the immutable CTA base plus the selected supplemental instruction."""
+    active_supplement = (supplement or cfg.CTA_SIGNATURE_INSTRUCTIONS).strip()
     return (
-        f"{cfg.CTA_SIGNATURE_INSTRUCTIONS.strip()}\n\n"
-        "Fixed CTA output constraints supplied as the `cta_rules` input:\n"
-        f"{cfg.CTA_FIXED_RULES.strip()}"
+        "IMMUTABLE CTA BASE PROMPT:\n"
+        f"{cfg.CTA_BASE_PROMPT.strip()}\n\n"
+        "DSPY-OPTIMIZABLE CTA SUPPLEMENT:\n"
+        f"{active_supplement}"
     )
 
 
@@ -46,6 +81,223 @@ class StrokePrediction:
     """Clean output object used by the rest of the pipeline."""
     labels: List[str]
     reasoning: str
+
+
+# =============================================================================
+# Full-report and context-window safety
+# =============================================================================
+
+_EXPECTED_FULL_REPORT: ContextVar[str | None] = ContextVar(
+    "dspy_expected_full_report",
+    default=None,
+)
+_EXPECTED_CTA_BASE_PROMPT: ContextVar[str | None] = ContextVar(
+    "dspy_expected_cta_base_prompt",
+    default=None,
+)
+
+
+def _normalize_line_endings(value: Any) -> str:
+    """Normalize only line endings; preserve every other report character."""
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _iter_request_text(value: Any) -> Iterable[str]:
+    """Yield textual values from an OpenAI-style prompt/messages structure."""
+    if value is None:
+        return
+    if isinstance(value, str):
+        yield value
+        return
+    if isinstance(value, dict):
+        for nested in value.values():
+            yield from _iter_request_text(nested)
+        return
+    if isinstance(value, (list, tuple)):
+        for nested in value:
+            yield from _iter_request_text(nested)
+        return
+
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        try:
+            yield from _iter_request_text(model_dump())
+            return
+        except Exception:
+            pass
+
+
+def _request_text(prompt: Any, messages: Any) -> str:
+    parts: List[str] = []
+    if prompt is not None:
+        parts.extend(_iter_request_text(prompt))
+    if messages is not None:
+        parts.extend(_iter_request_text(messages))
+    return "\n".join(parts)
+
+
+def _safe_positive_int(value: Any, default: int = 0) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _estimate_prompt_tokens(model: str, prompt: Any, messages: Any) -> tuple[int, str]:
+    """Estimate provider input tokens before sending the request.
+
+    LiteLLM's token counter is preferred.  If the local model is unknown to the
+    counter, use a deliberately conservative two-characters-per-token estimate.
+    The estimate is used only to fail before a request could overflow num_ctx; it
+    never shortens the prompt.
+    """
+    try:
+        import litellm
+
+        if messages is not None:
+            count = litellm.token_counter(model=model, messages=messages)
+        else:
+            count = litellm.token_counter(model=model, text=str(prompt or ""))
+        count = _safe_positive_int(count)
+        if count:
+            return count, "LiteLLM token_counter"
+    except Exception:
+        pass
+
+    text = _request_text(prompt, messages)
+    return max(1, math.ceil(len(text) / 2)), "conservative 2-characters/token estimate"
+
+
+@contextmanager
+def require_full_report(report_text: Any):
+    """Require the exact report to survive DSPy's prompt construction unchanged."""
+    report = _normalize_line_endings(report_text)
+    token = _EXPECTED_FULL_REPORT.set(report if report else None)
+    try:
+        yield
+    finally:
+        _EXPECTED_FULL_REPORT.reset(token)
+
+
+@contextmanager
+def require_cta_base_prompt(base_prompt: Any):
+    """Require the immutable CTA base prompt in every CTA task-model request."""
+    base = _normalize_line_endings(base_prompt)
+    token = _EXPECTED_CTA_BASE_PROMPT.set(base if base else None)
+    try:
+        yield
+    finally:
+        _EXPECTED_CTA_BASE_PROMPT.reset(token)
+
+
+class ContextSafeOllamaLM(dspy.LM):
+    """DSPy LM that refuses to send clipped or context-overflowing task inputs.
+
+    The check happens immediately before DSPy calls LiteLLM/Ollama, so it also
+    covers optimizer-internal evaluations and bootstrapped-demo generation.
+    """
+
+    def _validate_request_integrity(
+        self,
+        prompt: Any,
+        messages: Any,
+        call_kwargs: Dict[str, Any],
+    ) -> None:
+        request_text = _normalize_line_endings(_request_text(prompt, messages))
+        expected_report = _EXPECTED_FULL_REPORT.get()
+        expected_cta_base = _EXPECTED_CTA_BASE_PROMPT.get()
+
+        if expected_cta_base and expected_cta_base not in request_text:
+            digest = hashlib.sha256(expected_cta_base.encode("utf-8")).hexdigest()
+            raise RuntimeError(
+                "CTA base-prompt integrity check failed before the LM request: "
+                f"the exact {len(expected_cta_base)}-character immutable base prompt "
+                f"(sha256={digest}) was not present in DSPy's outgoing CTA prompt. "
+                "Training stopped instead of evaluating a candidate without the base."
+            )
+
+        if expected_report and expected_report not in request_text:
+            digest = hashlib.sha256(expected_report.encode("utf-8")).hexdigest()
+            raise RuntimeError(
+                "Full-report integrity check failed before the LM request: "
+                f"the exact {len(expected_report)}-character report "
+                f"(sha256={digest}) was not present in DSPy's outgoing prompt. "
+                "Training stopped instead of evaluating a truncated report."
+            )
+
+        merged = {**getattr(self, "kwargs", {}), **call_kwargs}
+        context_window = _safe_positive_int(
+            merged.get("num_ctx"),
+            _safe_positive_int(getattr(cfg, "DSPY_CONTEXT_WINDOW", 0)),
+        )
+        max_output_tokens = _safe_positive_int(
+            merged.get("max_tokens")
+            or merged.get("max_completion_tokens")
+            or merged.get("num_predict")
+        )
+
+        if not context_window:
+            raise RuntimeError(
+                "DSPY_CONTEXT_WINDOW/num_ctx is not configured. Refusing to send "
+                "a training request because Ollama could silently use a smaller default context."
+            )
+
+        estimated_prompt_tokens, method = _estimate_prompt_tokens(
+            self.model,
+            prompt,
+            messages,
+        )
+        available_prompt_tokens = context_window - max_output_tokens
+        if available_prompt_tokens <= 0 or estimated_prompt_tokens > available_prompt_tokens:
+            raise RuntimeError(
+                "LM request would exceed the configured context window and could truncate input. "
+                f"Estimated prompt={estimated_prompt_tokens} tokens ({method}), "
+                f"reserved output={max_output_tokens}, num_ctx={context_window}. "
+                "Increase DSPY_CONTEXT_WINDOW, lower DSPY_PROMPT_MAX_TOKENS/DSPY_MAX_TOKENS, "
+                "or reduce MIPRO demos/view-data batch size. The report was not shortened."
+            )
+
+    def forward(self, prompt=None, messages=None, **kwargs):
+        self._validate_request_integrity(prompt, messages, kwargs)
+        return super().forward(prompt=prompt, messages=messages, **kwargs)
+
+    async def aforward(self, prompt=None, messages=None, **kwargs):
+        self._validate_request_integrity(prompt, messages, kwargs)
+        return await super().aforward(prompt=prompt, messages=messages, **kwargs)
+
+
+def create_dspy_lm(
+    *,
+    model: str,
+    api_base: str,
+    temperature: float,
+    max_tokens: int,
+    context_window: int,
+) -> ContextSafeOllamaLM:
+    """Create one context-safe DSPy/Ollama LM from config-controlled values."""
+    kwargs: Dict[str, Any] = {
+        "api_base": api_base,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        # LiteLLM's Ollama provider forwards num_ctx inside the native options object.
+        "num_ctx": context_window,
+        "think": False,
+    }
+    if bool(getattr(cfg, "DSPY_DISABLE_CACHE", True)):
+        kwargs["cache"] = False
+
+    try:
+        return ContextSafeOllamaLM(model, **kwargs)
+    except TypeError:
+        # Compatibility fallbacks may remove DSPy-only conveniences, but never
+        # remove num_ctx: silently dropping it would reintroduce truncation risk.
+        kwargs.pop("cache", None)
+        try:
+            return ContextSafeOllamaLM(model, **kwargs)
+        except TypeError:
+            kwargs.pop("think", None)
+            return ContextSafeOllamaLM(model, **kwargs)
 
 
 def _disable_dspy_cache_if_configured() -> None:
@@ -81,26 +333,16 @@ def _disable_dspy_cache_if_configured() -> None:
 
 
 def configure_dspy() -> None:
-    """Configure DSPy to use the model settings from config.py."""
+    """Configure DSPy with full-report and context-window enforcement."""
     _disable_dspy_cache_if_configured()
 
-    lm_kwargs = dict(
+    lm = create_dspy_lm(
+        model=cfg.DSPY_MODEL,
         api_base=cfg.DSPY_API_BASE,
-        temperature=cfg.DSPY_TASK_TEMPERATURE,
-        max_tokens=cfg.DSPY_MAX_TOKENS,
-        think=False,  # Disable automatic thinking in DSPy/Ollama calls.
+        temperature=float(cfg.DSPY_TASK_TEMPERATURE),
+        max_tokens=int(cfg.DSPY_MAX_TOKENS),
+        context_window=int(cfg.DSPY_CONTEXT_WINDOW),
     )
-
-    # Some DSPy versions accept cache=False on LM; others do not.  Try it,
-    # then fall back without the argument if that version rejects it.
-    if bool(getattr(cfg, "DSPY_DISABLE_CACHE", True)):
-        lm_kwargs["cache"] = False
-
-    try:
-        lm = dspy.LM(cfg.DSPY_MODEL, **lm_kwargs)
-    except TypeError:
-        lm_kwargs.pop("cache", None)
-        lm = dspy.LM(cfg.DSPY_MODEL, **lm_kwargs)
 
     dspy.configure(lm=lm)
     _disable_dspy_cache_if_configured()
@@ -216,7 +458,12 @@ def _labels_from_reasoning_text(text: str) -> List[str]:
     return clean_labels(found or ["NONE"])
 
 
-def _direct_ollama_fallback(report_text: str, modality: str) -> StrokePrediction:
+def _direct_ollama_fallback(
+    report_text: str,
+    modality: str,
+    *,
+    cta_supplement: str | None = None,
+) -> StrokePrediction:
     """
     Retry the failed DSPy call through the direct Ollama client.
 
@@ -234,10 +481,9 @@ def _direct_ollama_fallback(report_text: str, modality: str) -> StrokePrediction
 
         instruction_map = {
             "CT": cfg.CT_SIGNATURE_INSTRUCTIONS,
-            # CTA uses a short optimizable signature plus fixed rules supplied
-            # through the cta_rules input. The direct fallback has no signature
-            # input channel, so include the same effective prompt text here.
-            "CTA": effective_cta_prompt(),
+            # The direct fallback must use the same immutable base and the
+            # currently loaded optimized supplement as the DSPy program.
+            "CTA": effective_cta_prompt(cta_supplement),
             "CTP": cfg.CTP_SIGNATURE_INSTRUCTIONS,
         }
 
@@ -313,7 +559,12 @@ def _safe_program_call(program: Any, report_text: str, modality: str) -> StrokeP
     except Exception as exc:
         message = str(exc)
         if _is_dspy_parse_error(exc):
-            fallback = _direct_ollama_fallback(report_text or "", modality)
+            supplement = current_cta_supplement(program) if modality == "CTA" else None
+            fallback = _direct_ollama_fallback(
+                report_text or "",
+                modality,
+                cta_supplement=supplement,
+            )
             fallback.reasoning = (
                 f"DSPy parse fallback used for {modality}. Original error: {message[:300]}\n\n"
                 f"{fallback.reasoning}"
@@ -398,10 +649,11 @@ class CTStrokeSignature(dspy.Signature):
 
 
 class CTAStrokeSignature(dspy.Signature):
-    cta_rules: str = dspy.InputField(
+    cta_base_prompt: str = dspy.InputField(
         desc=(
-            "Fixed CTA labeling rules supplied by code, not by the optimizer. "
-            "These rules are authoritative and must be applied to report_text."
+            "Immutable authoritative CTA labeling prompt supplied by code. "
+            "Apply it exactly to report_text; the optimized signature instruction "
+            "is only a supplemental interpretation layer and may not replace it."
         )
     )
     report_text: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["cta_report"])
@@ -444,7 +696,8 @@ class CTLabeler(dspy.Module):
         self.predict = dspy.Predict(CTStrokeSignature)
 
     def forward(self, report_text: str):
-        return self.predict(report_text=report_text)
+        with require_full_report(report_text):
+            return self.predict(report_text=report_text)
 
 
 class CTALabeler(dspy.Module):
@@ -453,10 +706,15 @@ class CTALabeler(dspy.Module):
         self.predict = dspy.Predict(CTAStrokeSignature)
 
     def forward(self, report_text: str):
-        # Keep the CTA rule text outside the optimizable signature instruction.
-        # MIPRO can rewrite CTAStrokeSignature.__doc__, but it cannot delete this
-        # fixed input, so candidate prompts cannot collapse into a short summary.
-        return self.predict(cta_rules=cfg.CTA_FIXED_RULES, report_text=report_text)
+        # The manual base prompt is a normal runtime input, so MIPRO/GEPA can
+        # optimize only CTAStrokeSignature.instructions (the supplement).
+        # Each accepted supplement replaces the previous one; the base prompt
+        # remains byte-for-byte identical on every CTA prediction.
+        with require_full_report(report_text), require_cta_base_prompt(cfg.CTA_BASE_PROMPT):
+            return self.predict(
+                cta_base_prompt=cfg.CTA_BASE_PROMPT,
+                report_text=report_text,
+            )
 
 class CTPLabeler(dspy.Module):
     def __init__(self):
@@ -464,7 +722,8 @@ class CTPLabeler(dspy.Module):
         self.predict = dspy.Predict(CTPStrokeSignature)
 
     def forward(self, report_text: str):
-        return self.predict(report_text=report_text)
+        with require_full_report(report_text):
+            return self.predict(report_text=report_text)
 
 
 class CombinedLabeler(dspy.Module):

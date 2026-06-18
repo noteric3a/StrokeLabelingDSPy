@@ -20,7 +20,9 @@ DSPY_MODEL = "ollama_chat/qwen3.6:latest"
 DSPY_API_BASE = "http://localhost:11434"
 DSPY_TASK_TEMPERATURE = 0.0
 DSPY_MAX_TOKENS = 1024
-DSPY_CONTEXT_WINDOW = 16384
+# Forwarded to every DSPy/Ollama request as options.num_ctx.  The training LM
+# refuses to send a request that would not fit without shortening the input.
+DSPY_CONTEXT_WINDOW = 32768
 DSPY_DISABLE_CACHE = True
 
 # Prompt/reflection model used by MIPROv2 or GEPA.  None reuses DSPY_MODEL but
@@ -135,16 +137,16 @@ DSPY_ACCEPTANCE_SPLIT = "dev"
 DSPY_MIPRO_AUTO = "medium"  # light, medium, or heavy
 DSPY_MIPRO_SEED = 9
 DSPY_MIPRO_INIT_TEMPERATURE = 0.9
-# False keeps optimizer-generated prompt bodies out of the terminal while
-# preserving DSPy/tqdm progress bars. Prompts are still saved in run artifacts.
-TRAIN_SHOW_OPTIMIZER_PROMPTS = False
-DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS = 3
+# Keep optimizer internals quiet so proposed prompt text is not dumped to the terminal.
+# Candidate prompts are still saved in each run folder under prompts/.
+DSPY_MIPRO_VERBOSE = False
+DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS = 0
 DSPY_MIPRO_MAX_LABELED_DEMOS = 0
 DSPY_MIPRO_METRIC_THRESHOLD = 1.0  # Keep only exact bootstrapped demonstrations.
 DSPY_MIPRO_PROGRAM_AWARE_PROPOSER = True
 DSPY_MIPRO_DATA_AWARE_PROPOSER = True
 DSPY_MIPRO_TIP_AWARE_PROPOSER = True
-DSPY_MIPRO_FEWSHOT_AWARE_PROPOSER = True
+DSPY_MIPRO_FEWSHOT_AWARE_PROPOSER = False
 DSPY_MIPRO_VIEW_DATA_BATCH_SIZE = 20
 DSPY_MIPRO_MINIBATCH_SIZE = 8
 DSPY_MIPRO_MINIBATCH_FULL_EVAL_STEPS = 3
@@ -157,31 +159,62 @@ DSPY_GEPA_CANDIDATE_SELECTION = "pareto"
 DSPY_GEPA_ADD_FORMAT_FAILURE_AS_FEEDBACK = True
 DSPY_GEPA_USE_MERGE = True
 
-# Candidate-signature guard.  This validates the instruction DSPy generated,
-# not the fixed rules concatenated into a debug preview.
-DSPY_PROMPT_MIN_CHARS = 250
-DSPY_PROMPT_MAX_CHARS = 6000
+# Candidate-supplement guard. This validates only the instruction DSPy generated,
+# not the immutable base prompt shown in the effective-prompt audit file.
+DSPY_PROMPT_MIN_CHARS = 80
+DSPY_PROMPT_MAX_CHARS = 3500
 DSPY_PROMPT_FORBIDDEN_TERMS = (
     "step-by-step",
     "chain of thought",
     "return only json",
     "respond with json",
     "output must be json",
+    "{cta_base_prompt}",
     "{cta_rules}",
+    "ignore cta_base_prompt",
+    "ignore the base prompt",
+    "override cta_base_prompt",
+    "override the base prompt",
+    "replace cta_base_prompt",
+    "replace the base prompt",
+    "disregard cta_base_prompt",
+    "disregard the base prompt",
+    "base prompt is optional",
+    "output every label",
     "carotid transient ischemic attack",
 )
-DSPY_CTA_REQUIRED_TERM_GROUPS = (
-    ("NONE",),
+
+# Leave this empty for the discovery experiment: a candidate does not have to
+# restate vessel names or even mention the base prompt. The base is enforced
+# structurally as a separate immutable input.
+DSPY_CTA_SUPPLEMENT_REQUIRED_TERM_GROUPS = ()
+
+# Used once at startup to verify that the immutable base prompt still contains
+# the intended clinical/output policy. Each tuple is an OR-group.
+DSPY_CTA_BASE_REQUIRED_TERM_GROUPS = (
+    ("Allowed labels",),
     ("RMCA",),
     ("LMCA",),
-    ("MCA", "M1", "M2"),
-    ("ACA", "A1", "A2"),
-    ("PCA", "P1", "P2"),
-    ("ICA", "carotid"),
-    ("occlusion", "thrombus"),
-    ("stenosis",),
-    ("chronic", "stable"),
+    ("RACA",),
+    ("LACA",),
+    ("RPCA",),
+    ("LPCA",),
+    ("RICA",),
+    ("LICA",),
+    ("RCA",),
+    ("LCA",),
+    ("M1", "M2"),
+    ("A1", "A2"),
+    ("P1", "P2"),
+    ("severe flow-limiting stenosis",),
+    ("chronic occlusion",),
+    ("hypoplastic",),
+    ("Do not include NONE",),
 )
+
+# Reject a candidate that copies the complete base prompt into the supplement.
+# The base is already supplied separately on every CTA call.
+DSPY_CTA_REJECT_FULL_BASE_COPY = True
 
 
 # =============================================================================
@@ -264,70 +297,6 @@ LABEL_ALIASES = {
 
 
 # =============================================================================
-# CTA annotation-policy switches
-# =============================================================================
-
-# These defaults reflect the behavior inferred from the uploaded answer key and
-# optimization runs.  They are annotation-policy choices, not universal clinical
-# rules.  Review them against your adjudicated labeling protocol.
-CTA_COUNT_SEVERE_STENOSIS = False
-CTA_COUNT_CHRONIC_OR_STABLE_OCCLUSION = True
-CTA_COUNT_POSSIBLE_OCCLUSION = True
-CTA_INCLUDE_PARENT_ICA_WITH_DOWNSTREAM = False
-CTA_INCLUDE_CERVICAL_CAROTID = True
-
-def _build_cta_signature() -> str:
-    stenosis_rule = (
-        "Count severe flow-limiting stenosis as a positive territory."
-        if CTA_COUNT_SEVERE_STENOSIS
-        else "Do not assign a territory for stenosis alone, even when described as severe, unless an occlusion or thrombus is also present."
-    )
-    chronic_rule = (
-        "Count a specifically named arterial occlusion even when it is described as chronic or stable."
-        if CTA_COUNT_CHRONIC_OR_STABLE_OCCLUSION
-        else "Do not assign labels for chronic or stable occlusions."
-    )
-    possible_rule = (
-        "Count a specifically named possible or suspected occlusion when the report presents it as a vascular finding."
-        if CTA_COUNT_POSSIBLE_OCCLUSION
-        else "Do not assign a label for merely possible or suspected occlusion."
-    )
-    parent_rule = (
-        "Include the parent RICA/LICA label together with downstream MCA/ACA labels when both are described."
-        if CTA_INCLUDE_PARENT_ICA_WITH_DOWNSTREAM
-        else "When an ICA/terminus lesion has explicit downstream MCA or ACA involvement, output the downstream territory labels and omit the parent RICA/LICA label."
-    )
-    cervical_rule = (
-        "Use RCA/LCA for qualifying common or cervical carotid occlusion."
-        if CTA_INCLUDE_CERVICAL_CAROTID
-        else "Do not output RCA/LCA for common or cervical carotid disease."
-    )
-
-    return f"""
-Label vascular territories from CTA report text using the dataset's annotation policy.
-
-Vessel mapping:
-- Right M1/M2/MCA occlusion or thrombus -> RMCA; left -> LMCA.
-- Right A1/A2/ACA occlusion or thrombus -> RACA; left -> LACA.
-- Right P1/P2/PCA occlusion or thrombus -> RPCA; left -> LPCA.
-- Right/left PICA occlusion -> RPICA/LPICA; basilar occlusion -> BA; vertebral occlusion -> RVA/LVA.
-- Intracranial ICA, carotid terminus, terminal ICA, supraclinoid ICA, or paraclinoid ICA -> RICA/LICA unless the parent-label policy below suppresses it.
-- Common or cervical carotid -> RCA/LCA only when the cervical-carotid policy below permits it.
-
-Annotation policy:
-- Label named arterial occlusion or thrombus and preserve all supported territories in multi-vessel cases.
-- {stenosis_rule}
-- {chronic_rule}
-- {possible_rule}
-- {parent_rule}
-- {cervical_rule}
-- Use NONE only when no qualifying vascular label remains.
-- Do not infer a territory from incidental atherosclerosis, hypoplasia, congenital variants, or nonvascular wording alone.
-- Return only allowed comma-separated labels and exactly one short reasoning sentence.
-""".strip()
-
-
-# =============================================================================
 # DSPy signature instructions
 # =============================================================================
 
@@ -349,37 +318,40 @@ Rules:
 - Return only allowed comma-separated labels and exactly one short reasoning sentence.
 """.strip()
 
+
+# =============================================================================
+# CTA base-prompt + DSPy supplement experiment
+# =============================================================================
+
+# Experimental invariant:
+#   effective CTA guidance = immutable CTA_BASE_PROMPT
+#                          + one DSPy-optimizable supplemental instruction.
+#
+# DSPy never edits CTA_BASE_PROMPT. An accepted candidate replaces the previous
+# supplement; supplements are not concatenated into an ever-growing prompt.
+CTA_EXPERIMENT_VERSION = "v1"
+CTA_EXPERIMENT_NAME = f"cta_base_plus_supplement_{DSPY_OPTIMIZER}_{CTA_EXPERIMENT_VERSION}"
+CTA_BASE_PROMPT_VERSION = "manual_cta_base_v1"
+
 CTA_BASE_PROMPT = f"""
 Your goal is to label acute stroke-related vascular territory from CTA report text.
 
 Allowed labels: {_ALLOWED_LABELS_TEXT}.
 
 CTA-specific rules:
-- Target only acute or newly/worsening large-vessel occlusion, named branch
-  occlusion, or severe flow-limiting stenosis.
+- Target only acute or newly/worsening large-vessel occlusion, named branch occlusion, or severe flow-limiting stenosis.
 - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
-- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute
-  territory is clearly stated.
-- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute
-  territory is clearly stated.
-- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA
-  maps to LACA.
-- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA
-  maps to LPCA.
-- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
-  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
-- Use RCA/LCA only for common carotid or cervical carotid involvement.
-  Do not use RCA/LCA for carotid terminus.
-- Prefer specific downstream territory labels when MCA/ACA/PCA involvement
-  is clearly identified.
-- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion
-  is present.
-- Do not include NONE with any positive label. If the answer is NONE,
-  output only NONE.
-- Never output every allowed label. Output only labels directly supported
-  by the report.
-- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion,
-  stable findings, congenital variants, or hypoplastic vessels.
+- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute territory is clearly stated.
+- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute territory is clearly stated.
+- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA maps to LACA.
+- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA maps to LPCA.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA, supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement. Do not use RCA/LCA for carotid terminus.
+- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+- Do not include NONE with any positive label. If the answer is NONE, output only NONE.
+- Never output every allowed label. Output only labels directly supported by the report.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, stable findings, congenital variants, or hypoplastic vessels.
 
 Output rules:
 - Do not explain step by step.
@@ -389,19 +361,22 @@ Output rules:
 - Return no additional fields or commentary.
 """.strip()
 
-# Keep the base prompt in the fixed CTA input.
-CTA_FIXED_RULES = CTA_BASE_PROMPT
+# This is the only CTA instruction DSPy is allowed to rewrite. Start generic so
+# the experiment can reveal whether MIPRO/GEPA discovers useful radiology terms,
+# vessel segments, exclusion wording, or parent-versus-downstream distinctions.
+CTA_INITIAL_SUPPLEMENT = """
+Apply the immutable `cta_base_prompt` to the complete CTA `report_text`.
 
-CTA_SIGNATURE_INSTRUCTIONS = """
-Apply the authoritative `cta_rules` to the CTA `report_text`.
-
-Use this supplemental instruction to improve recognition of radiology wording,
+Use this supplemental instruction only to improve recognition of radiology wording,
 named vessel segments, laterality, acuity, uncertainty, negation, and
-parent-versus-downstream territory selection.
-
-Do not summarize, replace, weaken, or contradict `cta_rules`.
-Return only the required labels and one short reasoning sentence.
+parent-versus-downstream territory selection. Add generalizable distinctions when
+they improve label accuracy. Do not summarize, replace, weaken, or contradict the
+authoritative base prompt. Return only the required labels and one short reasoning
+sentence.
 """.strip()
+
+# DSPy reads this as CTAStrokeSignature.instructions and optimizes it.
+CTA_SIGNATURE_INSTRUCTIONS = CTA_INITIAL_SUPPLEMENT
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""
 Label acute perfusion territory from CT perfusion report text.
@@ -433,7 +408,7 @@ Rules:
 
 DSPY_PROGRAM_NAMES = {
     "CT": "ct_labeler",
-    "CTA": "cta_labeler_policy_optimized",
+    "CTA": CTA_EXPERIMENT_NAME,
     "CTP": "ctp_labeler",
     "Combined": "combined_labeler",
 }

@@ -640,24 +640,36 @@ def _format_current_prompt_columns_for_display(output_df: pd.DataFrame) -> pd.Da
     """Append active prompt/instruction columns to the Excel display DataFrame.
 
     The DSPy version does not always store a literal prompt in each JSON case.
-    Instead, the active task instructions live in config.py as
-    CT_SIGNATURE_INSTRUCTIONS, CTA_SIGNATURE_INSTRUCTIONS, CTP_SIGNATURE_INSTRUCTIONS,
-    and COMBINED_SIGNATURE_INSTRUCTIONS.  This function copies those active
-    config prompts into the final spreadsheet so every output file records the
-    prompt/instruction context used for the run.
+    CT/CTP/Combined instructions live in config.py. CTA is split into an
+    immutable base prompt plus the currently loaded optimized supplement. This
+    function records both pieces and their combined effective prompt.
     """
     display_df = output_df.copy()
 
     if not bool(getattr(cfg, "INCLUDE_CURRENT_PROMPT_COLUMNS", False)):
         return display_df
 
-    cta_prompt = (
-        f"{cfg.CTA_SIGNATURE_INSTRUCTIONS.strip()}\n\n"
-        "Fixed CTA output constraints supplied as the `cta_rules` input:\n"
-        f"{cfg.CTA_FIXED_RULES.strip()}"
-    )
+    # During a normal labeling run, dspy_programs has already loaded the saved
+    # optimized CTA program. Read its active supplement so the spreadsheet does
+    # not incorrectly show only the config seed after optimization.
+    try:
+        from dspy_programs import current_cta_supplement, effective_cta_prompt
+
+        cta_supplement = current_cta_supplement()
+        cta_prompt = effective_cta_prompt(cta_supplement)
+    except Exception:
+        cta_supplement = cfg.CTA_SIGNATURE_INSTRUCTIONS
+        cta_prompt = (
+            "IMMUTABLE CTA BASE PROMPT:\n"
+            f"{cfg.CTA_BASE_PROMPT.strip()}\n\n"
+            "DSPY-OPTIMIZABLE CTA SUPPLEMENT:\n"
+            f"{cta_supplement.strip()}"
+        )
+
     prompt_columns = {
         "CT Current Prompt": cfg.CT_SIGNATURE_INSTRUCTIONS,
+        "CTA Base Prompt": cfg.CTA_BASE_PROMPT,
+        "CTA DSPy Supplement": cta_supplement,
         "CTA Current Prompt": cta_prompt,
         "CTP Current Prompt": cfg.CTP_SIGNATURE_INSTRUCTIONS,
         "Combined Current Prompt": cfg.COMBINED_SIGNATURE_INSTRUCTIONS,

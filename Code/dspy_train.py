@@ -8,6 +8,8 @@ Accuracy-oriented design:
   never as task-model inputs;
 - a stratified four-way split separates prompt training, optimizer validation,
   promotion, and final testing;
+- for CTA, the manual base prompt is immutable and DSPy optimizes only one
+  supplemental instruction; accepted supplements replace rather than concatenate;
 - DSPy receives a dense exact/F1 search reward;
 - a candidate replaces the saved best program only when its promotion score
   improves without regressing exact accuracy;
@@ -20,11 +22,13 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import hashlib
 import inspect
 import io
 import json
 import logging
 import math
+import os
 import random
 import re
 from collections import Counter, defaultdict
@@ -37,7 +41,13 @@ import dspy
 import pandas as pd
 
 import config as cfg
-from dspy_programs import CTALabeler, CTLabeler, CTPLabeler, configure_dspy
+from dspy_programs import (
+    CTALabeler,
+    CTLabeler,
+    CTPLabeler,
+    configure_dspy,
+    create_dspy_lm,
+)
 from utils import normalize_labels
 
 logging.getLogger("dspy.predict.predict").setLevel(logging.ERROR)
@@ -50,10 +60,15 @@ logging.getLogger("dspy.predict.predict").setLevel(logging.ERROR)
 _GOLD_BY_REPORT_KEY: Dict[str, str] = {}
 _RAW_GOLD_BY_REPORT_KEY: Dict[str, Any] = {}
 _CASE_ID_BY_REPORT_KEY: Dict[str, str] = {}
+_REPORT_INTEGRITY_BY_EXACT_TEXT: Dict[str, Tuple[int, str]] = {}
 
 
 def _report_key(report_text: Any) -> str:
     return " ".join(str(report_text or "").split())
+
+
+def _report_sha256(report_text: Any) -> str:
+    return hashlib.sha256(str(report_text or "").encode("utf-8")).hexdigest()
 
 
 def _value(obj: Any, field: str, default: Any = "") -> Any:
@@ -72,7 +87,40 @@ def _value(obj: Any, field: str, default: Any = "") -> Any:
 
 
 def _report_text_for_example(example: Any) -> str:
-    return str(_value(example, "report_text", "") or "")
+    """Return the complete report and fail if a DSPy Example mutated or clipped it."""
+    report_text = str(_value(example, "report_text", "") or "")
+    if not report_text:
+        return report_text
+
+    if _REPORT_INTEGRITY_BY_EXACT_TEXT:
+        expected = _REPORT_INTEGRITY_BY_EXACT_TEXT.get(report_text)
+        if expected is None:
+            actual_hash = _report_sha256(report_text)
+            raise RuntimeError(
+                "Report integrity check failed: this DSPy Example is not an exact match for any "
+                "complete report loaded from the spreadsheet. "
+                f"Received {len(report_text)} characters and sha256={actual_hash}. "
+                "Training stopped instead of using a clipped or altered input."
+            )
+        expected_length, expected_hash = expected
+        actual_hash = _report_sha256(report_text)
+        if len(report_text) != expected_length or actual_hash != expected_hash:
+            raise RuntimeError(
+                "Report integrity check failed: report text changed after spreadsheet loading. "
+                f"Expected {expected_length} characters and sha256={expected_hash}; "
+                f"received {len(report_text)} characters and sha256={actual_hash}."
+            )
+    return report_text
+
+
+def _report_debug_fields(example: Any) -> Dict[str, Any]:
+    """Return full, auditable report fields for JSON logs; never a clipped preview."""
+    report_text = _report_text_for_example(example)
+    return {
+        "report_text": report_text,
+        "report_text_chars": len(report_text),
+        "report_text_sha256": _report_sha256(report_text),
+    }
 
 
 def _case_id_for_example(example: Any) -> str:
@@ -252,7 +300,10 @@ def gepa_feedback_metric(
         feedback = (
             f"Expected {sorted(expected)} but predicted {sorted(predicted)}. "
             f"Missing labels: {missing or 'none'}. Extra labels: {extra or 'none'}. "
-            "Revise the instruction to correct this vessel/laterality/policy decision without breaking cases that already match."
+            "Revise only the supplemental instruction. Add a generalizable distinction for "
+            "radiology wording, vessel segment, laterality, acuity, uncertainty, negation, or "
+            "parent-versus-downstream selection. Do not restate, weaken, or contradict the "
+            "immutable CTA base prompt, and do not break cases that already match."
         )
 
     prediction_cls = getattr(dspy, "Prediction", None)
@@ -266,10 +317,58 @@ def gepa_feedback_metric(
 # =============================================================================
 
 
+def _normalized_guard_text(value: Any) -> str:
+    text = str(value or "").lower()
+    text = text.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+    return " ".join(text.split())
+
+
+def validate_cta_base_plus_supplement_config() -> None:
+    """Validate the experimental invariant before any model calls are made."""
+    base_prompt = str(getattr(cfg, "CTA_BASE_PROMPT", "") or "").strip()
+    supplement = str(getattr(cfg, "CTA_SIGNATURE_INSTRUCTIONS", "") or "").strip()
+    if not base_prompt:
+        raise ValueError("CTA_BASE_PROMPT must not be empty.")
+    if not supplement:
+        raise ValueError("CTA_SIGNATURE_INSTRUCTIONS/CTA_INITIAL_SUPPLEMENT must not be empty.")
+
+    normalized_base = _normalized_guard_text(base_prompt)
+    normalized_supplement = _normalized_guard_text(supplement)
+    if normalized_base == normalized_supplement or normalized_base in normalized_supplement:
+        raise ValueError(
+            "The CTA supplement contains the complete base prompt. Keep CTA_BASE_PROMPT "
+            "separate and put only supplemental guidance in CTA_SIGNATURE_INSTRUCTIONS."
+        )
+
+    missing_groups: List[Tuple[str, ...]] = []
+    for group in getattr(cfg, "DSPY_CTA_BASE_REQUIRED_TERM_GROUPS", ()):
+        if not any(_normalized_guard_text(term) in normalized_base for term in group):
+            missing_groups.append(tuple(group))
+    if missing_groups:
+        readable = ["/".join(group) for group in missing_groups]
+        raise ValueError(
+            "CTA_BASE_PROMPT is missing required experiment concepts: " + ", ".join(readable)
+        )
+
+    # The allowed-label declaration should contain every configured label as a
+    # standalone token, not merely as a substring of another word.
+    missing_labels = [
+        label for label in cfg.ALLOWED_LABELS
+        if re.search(rf"\b{re.escape(label.lower())}\b", normalized_base) is None
+    ]
+    if missing_labels:
+        raise ValueError(
+            "CTA_BASE_PROMPT does not list every configured allowed label: "
+            + ", ".join(missing_labels)
+        )
+
+
 def validate_training_config() -> None:
     report_type = str(cfg.TRAIN_REPORT_TYPE).upper().strip()
     if report_type not in {"CT", "CTA", "CTP"}:
         raise ValueError("TRAIN_REPORT_TYPE must be CT, CTA, or CTP.")
+    if report_type == "CTA":
+        validate_cta_base_plus_supplement_config()
 
     ratios = dict(cfg.TRAIN_SPLIT_RATIOS)
     required = {"train", "optimizer_val", "dev", "test"}
@@ -295,6 +394,22 @@ def validate_training_config() -> None:
         raise ValueError("DSPY_ACCEPTANCE_SPLIT must name one of the configured splits.")
     if str(cfg.DSPY_ACCEPTANCE_SPLIT) == "test":
         raise ValueError("The final test split cannot be used as the promotion split.")
+
+    context_window = int(cfg.DSPY_CONTEXT_WINDOW)
+    task_output = int(cfg.DSPY_MAX_TOKENS)
+    prompt_output = int(cfg.DSPY_PROMPT_MAX_TOKENS)
+    if context_window <= 0:
+        raise ValueError("DSPY_CONTEXT_WINDOW must be a positive Ollama num_ctx value.")
+    if task_output <= 0 or prompt_output <= 0:
+        raise ValueError("DSPY_MAX_TOKENS and DSPY_PROMPT_MAX_TOKENS must be positive.")
+    if context_window <= task_output + 512:
+        raise ValueError(
+            "DSPY_CONTEXT_WINDOW must leave at least 512 input tokens after DSPY_MAX_TOKENS."
+        )
+    if context_window <= prompt_output + 512:
+        raise ValueError(
+            "DSPY_CONTEXT_WINDOW must leave at least 512 input tokens after DSPY_PROMPT_MAX_TOKENS."
+        )
 
 
 # =============================================================================
@@ -406,6 +521,7 @@ def load_examples(
     _GOLD_BY_REPORT_KEY.clear()
     _RAW_GOLD_BY_REPORT_KEY.clear()
     _CASE_ID_BY_REPORT_KEY.clear()
+    _REPORT_INTEGRITY_BY_EXACT_TEXT.clear()
 
     examples: List[Any] = []
     missing_gt = 0
@@ -414,10 +530,11 @@ def load_examples(
 
     for _, row in reports_df.iterrows():
         case_id = normalize_case_id(row.get(reports_case_col))
-        report_text = "" if pd.isna(row.get(report_col)) else str(row.get(report_col)).strip()
+        raw_report = row.get(report_col)
+        report_text = "" if pd.isna(raw_report) else str(raw_report)
         if not case_id:
             continue
-        if not report_text:
+        if not report_text.strip():
             missing_report += 1
             continue
         if case_id not in gt_by_case:
@@ -436,17 +553,32 @@ def load_examples(
         _GOLD_BY_REPORT_KEY[key] = normalized_gold
         _RAW_GOLD_BY_REPORT_KEY[key] = raw_gold
         _CASE_ID_BY_REPORT_KEY[key] = case_id
+        _REPORT_INTEGRITY_BY_EXACT_TEXT[report_text] = (
+            len(report_text),
+            _report_sha256(report_text),
+        )
 
         # Labels are supervised outputs, not task inputs.  MIPRO/GEPA can learn
         # from training labels, while normal predictions still receive only
         # report_text.
         example = dspy.Example(report_text=report_text, labels=normalized_gold).with_inputs("report_text")
+        round_trip_text = str(_value(example, "report_text", "") or "")
+        if round_trip_text != report_text:
+            raise RuntimeError(
+                f"DSPy Example construction changed report text for case {case_id}: "
+                f"loaded {len(report_text)} characters but retained {len(round_trip_text)}."
+            )
         examples.append(example)
 
     if max_cases is not None:
         examples = examples[: max(0, int(max_cases))]
 
     print(f"Loaded {len(examples)} {report_type} examples")
+    report_lengths = [len(_report_text_for_example(example)) for example in examples]
+    print(
+        "Full-report integrity verified after Excel -> DSPy Example loading: "
+        f"min={min(report_lengths)}, max={max(report_lengths)} characters"
+    )
     print(f"Skipped rows missing report text: {missing_report}")
     print(f"Skipped rows missing ground truth: {missing_gt}")
     if duplicate_conflicts:
@@ -579,46 +711,37 @@ def disable_training_caches() -> None:
 
 
 @contextlib.contextmanager
-def quiet_optimizer_prompt_logging():
-    """Hide optimizer prompt bodies while preserving progress bars.
+def capture_optimizer_console(path: Optional[Path]):
+    """Keep optimizer-generated prompt bodies out of the terminal.
 
-    MIPROv2 emits proposed instructions through INFO-level logging and can
-    print complete candidate programs when its verbose flag is enabled.  The
-    optimizer is configured with verbose=False below, and this context manager
-    temporarily suppresses DEBUG/INFO log records during compilation.  It does
-    not redirect stdout or stderr, so DSPy/tqdm progress bars remain visible.
-    Warnings, errors, and tracebacks are still shown.
+    MIPROv2 and GEPA may print complete proposed instructions while compiling.
+    Redirect stdout to a run log while leaving stderr available for tqdm progress
+    bars. If run logging is disabled, discard optimizer stdout.
     """
-    if bool(getattr(cfg, "TRAIN_SHOW_OPTIMIZER_PROMPTS", False)):
-        yield
+    # Optimizer prompt bodies are normally printed to stdout, while tqdm progress
+    # bars use stderr. Redirect stdout only so prompts stay out of the terminal
+    # without hiding the progress bars the user asked to keep.
+    if path is None:
+        with open(os.devnull, "w", encoding="utf-8") as sink:
+            with contextlib.redirect_stdout(sink):
+                yield
         return
 
-    previous_disable_level = logging.root.manager.disable
-    logging.disable(logging.INFO)
-    try:
-        yield
-    finally:
-        logging.disable(previous_disable_level)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", buffering=1) as sink:
+        with contextlib.redirect_stdout(sink):
+            yield
 
 
 def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> Any:
-    kwargs: Dict[str, Any] = {
-        "api_base": api_base,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "think": False,
-    }
-    if cfg.DSPY_DISABLE_CACHE:
-        kwargs["cache"] = False
-    try:
-        return dspy.LM(model, **kwargs)
-    except TypeError:
-        kwargs.pop("cache", None)
-        try:
-            return dspy.LM(model, **kwargs)
-        except TypeError:
-            kwargs.pop("think", None)
-            return dspy.LM(model, **kwargs)
+    """Create the optimizer LM with the same context-overflow guard as the task LM."""
+    return create_dspy_lm(
+        model=model,
+        api_base=api_base,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        context_window=int(cfg.DSPY_CONTEXT_WINDOW),
+    )
 
 
 def prompt_or_reflection_model() -> Any:
@@ -679,9 +802,7 @@ def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
             "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
             "seed": int(cfg.DSPY_MIPRO_SEED),
             "init_temperature": float(cfg.DSPY_MIPRO_INIT_TEMPERATURE),
-            # False by default: save prompt bodies to artifacts without
-            # printing them. Progress bars are independent of this flag.
-            "verbose": bool(cfg.TRAIN_SHOW_OPTIMIZER_PROMPTS),
+            "verbose": bool(cfg.DSPY_MIPRO_VERBOSE),
             "track_stats": True,
             "metric_threshold": float(cfg.DSPY_MIPRO_METRIC_THRESHOLD),
         }
@@ -765,7 +886,7 @@ def prediction_debug_row(example: Any, pred: Any = None, error: Optional[Excepti
     row: Dict[str, Any] = {
         "case_id": _case_id_for_example(example),
         "gold": sorted(gold),
-        "report_text_preview": _report_text_for_example(example)[:1000],
+        **_report_debug_fields(example),
     }
     if error is not None:
         row.update({
@@ -954,18 +1075,24 @@ def _signature_instructions(report_type: str) -> str:
     }[report_type]
 
 
-def _fixed_rules(report_type: str) -> str:
-    return cfg.CTA_FIXED_RULES if report_type == "CTA" else ""
+def _base_prompt(report_type: str) -> str:
+    return cfg.CTA_BASE_PROMPT if report_type == "CTA" else ""
+
+
+def _prompt_sha256(text: str) -> str:
+    return hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
 
 
 def effective_prompt_text(report_type: str, signature_instructions: str) -> str:
-    fixed = _fixed_rules(report_type)
-    if not fixed:
+    """Return a human-readable base + supplement audit view."""
+    base = _base_prompt(report_type)
+    if not base:
         return signature_instructions.strip()
     return (
-        f"{signature_instructions.strip()}\n\n"
-        "Fixed CTA output constraints supplied as the `cta_rules` input:\n"
-        f"{fixed.strip()}"
+        "IMMUTABLE CTA BASE PROMPT:\n"
+        f"{base.strip()}\n\n"
+        "DSPY-OPTIMIZABLE CTA SUPPLEMENT:\n"
+        f"{signature_instructions.strip()}"
     )
 
 
@@ -1014,32 +1141,81 @@ def save_program(program: Any, path: Path) -> None:
 
 
 def _normalized_prompt(text: str) -> str:
-    normalized = str(text or "").lower()
-    normalized = normalized.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
-    return " ".join(normalized.split())
+    return _normalized_guard_text(text)
+
+
+def _candidate_terms_absent_from_base(supplement: str, base_prompt: str) -> List[str]:
+    """Return an audit list of candidate terms that do not occur in the base."""
+    token_pattern = re.compile(r"\b(?:[A-Za-z][A-Za-z-]{2,}|[MAP][1-4]|[A-Z]{2,6})\b")
+    base_terms = {match.group(0).lower() for match in token_pattern.finditer(base_prompt)}
+    stopwords = {
+        "the", "and", "for", "with", "from", "that", "this", "only", "when",
+        "into", "must", "should", "using", "use", "apply", "report", "prompt",
+        "labels", "label", "instruction", "instructions", "required", "return",
+        "authoritative", "supplemental", "complete", "improve", "accuracy",
+        "immutable", "base", "recognize", "recognition", "generalizable",
+        "criteria", "otherwise", "qualify", "qualifies", "preserve", "add",
+        "distinction", "distinctions",
+    }
+    output: List[str] = []
+    seen: Set[str] = set()
+    for match in token_pattern.finditer(supplement):
+        original = match.group(0)
+        key = original.lower()
+        if key in base_terms or key in stopwords or key in seen:
+            continue
+        seen.add(key)
+        output.append(original)
+    return output[:200]
+
+
+def _forbidden_phrase_is_active(normalized_prompt: str, forbidden: str) -> bool:
+    """Ignore a forbidden phrase when it is explicitly negated (e.g. do not override)."""
+    phrase = _normalized_prompt(forbidden)
+    start = 0
+    while True:
+        index = normalized_prompt.find(phrase, start)
+        if index < 0:
+            return False
+        prefix = normalized_prompt[max(0, index - 24):index].strip()
+        if not (
+            prefix.endswith("do not")
+            or prefix.endswith("don't")
+            or prefix.endswith("never")
+            or prefix.endswith("must not")
+            or prefix.endswith("should not")
+        ):
+            return True
+        start = index + len(phrase)
 
 
 def prompt_quality_ok(signature_prompt: str, report_type: str) -> Tuple[bool, str]:
-    """Validate only DSPy's generated signature instruction, not fixed rules."""
+    """Validate DSPy's supplemental instruction independently of the base."""
     prompt = str(signature_prompt or "").strip()
     if len(prompt) < int(cfg.DSPY_PROMPT_MIN_CHARS):
-        return False, f"signature prompt too short ({len(prompt)} < {cfg.DSPY_PROMPT_MIN_CHARS})"
+        return False, f"supplement too short ({len(prompt)} < {cfg.DSPY_PROMPT_MIN_CHARS})"
     if len(prompt) > int(cfg.DSPY_PROMPT_MAX_CHARS):
-        return False, f"signature prompt too long ({len(prompt)} > {cfg.DSPY_PROMPT_MAX_CHARS})"
+        return False, f"supplement too long ({len(prompt)} > {cfg.DSPY_PROMPT_MAX_CHARS})"
 
     normalized = " " + _normalized_prompt(prompt) + " "
     for forbidden in cfg.DSPY_PROMPT_FORBIDDEN_TERMS:
-        if _normalized_prompt(forbidden) in normalized:
-            return False, f"signature prompt contains forbidden wording: {forbidden!r}"
+        if _forbidden_phrase_is_active(normalized, forbidden):
+            return False, f"supplement contains forbidden wording: {forbidden!r}"
 
     if report_type == "CTA":
+        normalized_base = _normalized_prompt(_base_prompt(report_type))
+        if bool(getattr(cfg, "DSPY_CTA_REJECT_FULL_BASE_COPY", True)) and (
+            normalized == " " + normalized_base + " " or normalized_base in normalized
+        ):
+            return False, "supplement copied the complete immutable CTA base prompt"
+
         missing_groups: List[Tuple[str, ...]] = []
-        for group in cfg.DSPY_CTA_REQUIRED_TERM_GROUPS:
+        for group in getattr(cfg, "DSPY_CTA_SUPPLEMENT_REQUIRED_TERM_GROUPS", ()):
             if not any(_normalized_prompt(term) in normalized for term in group):
                 missing_groups.append(tuple(group))
         if missing_groups:
             readable = ["/".join(group) for group in missing_groups]
-            return False, "signature prompt is missing required policy concepts: " + ", ".join(readable)
+            return False, "supplement does not defer to the base prompt: " + ", ".join(readable)
     return True, "ok"
 
 
@@ -1069,7 +1245,19 @@ def save_split_debug(
     redact_splits: Set[str] | None = None,
 ) -> None:
     redacted = set(redact_splits or set())
-    output: Dict[str, Any] = {"sizes": {}, "label_counts": {}, "examples": []}
+    output: Dict[str, Any] = {
+        "report_integrity": {
+            "full_report_text_saved": True,
+            "exact_report_guard_enabled": True,
+            "cta_base_prompt_guard_enabled": str(cfg.TRAIN_REPORT_TYPE).upper().strip() == "CTA",
+            "ollama_num_ctx": int(cfg.DSPY_CONTEXT_WINDOW),
+            "task_max_output_tokens": int(cfg.DSPY_MAX_TOKENS),
+            "prompt_max_output_tokens": int(cfg.DSPY_PROMPT_MAX_TOKENS),
+        },
+        "sizes": {},
+        "label_counts": {},
+        "examples": [],
+    }
     for split, examples in splits.items():
         output["sizes"][split] = len(examples)
         counts: Counter[str] = Counter()
@@ -1081,7 +1269,7 @@ def save_split_debug(
                 "split": split,
                 "case_id": _case_id_for_example(example),
                 "labels": labels if split not in redacted else "<redacted until final audit>",
-                "report_text_preview": _report_text_for_example(example)[:500],
+                **_report_debug_fields(example),
             })
         output["label_counts"][split] = (
             dict(sorted(counts.items())) if split not in redacted else "<redacted until final audit>"
@@ -1158,16 +1346,33 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         warm_start_status = "warm-start disabled in config.py"
 
     before_signature = extract_program_instructions(program) or _signature_instructions(report_type)
+    base_prompt = _base_prompt(report_type)
+    base_prompt_hash = _prompt_sha256(base_prompt) if base_prompt else ""
     before_effective = effective_prompt_text(report_type, before_signature)
 
     print(f"\nTraining {report_type}; iteration {iteration}")
     print(" | ".join(f"{name}: {len(values)}" for name, values in splits.items()))
     print(warm_start_status)
+    if report_type == "CTA":
+        print(
+            f"CTA experiment: {cfg.CTA_EXPERIMENT_NAME}; immutable base "
+            f"sha256={base_prompt_hash[:12]}…; only the supplement is optimized."
+        )
+    print(
+        "Full-report guard active: exact report text is required in every task-model request; "
+        f"Ollama num_ctx={cfg.DSPY_CONTEXT_WINDOW}."
+    )
 
     if layout is not None:
         save_split_debug(layout["debug"] / "split_examples.json", splits, redact_splits={"test"})
         (layout["prompts"] / "before_signature_prompt.txt").write_text(before_signature, encoding="utf-8")
+        (layout["prompts"] / "before_supplement.txt").write_text(before_signature, encoding="utf-8")
         (layout["prompts"] / "before_effective_prompt.txt").write_text(before_effective, encoding="utf-8")
+        if base_prompt:
+            (layout["prompts"] / "cta_base_prompt.txt").write_text(base_prompt, encoding="utf-8")
+            (layout["prompts"] / "cta_base_prompt_sha256.txt").write_text(
+                base_prompt_hash + "\n", encoding="utf-8"
+            )
         save_program(program, layout["prompts"] / "before_program.json")
 
     if cfg.TRAIN_SMOKE_TEST:
@@ -1209,12 +1414,22 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         return summary
 
     optimizer_name, optimizer = build_optimizer(run_dir)
+    optimizer_console_path = (
+        layout["debug"] / "optimizer_console.log"
+        if layout is not None
+        else None
+    )
     print(
         f"{optimizer_name.upper()} will train on {len(splits['train'])} examples and "
         f"search on {len(splits['optimizer_val'])} optimizer-validation examples."
     )
+    if optimizer_console_path is not None:
+        print(f"Optimizer console output saved to: {optimizer_console_path}")
+    else:
+        print("Optimizer console output is hidden because TRAIN_SAVE_RUN_LOGS is disabled.")
+
     try:
-        with quiet_optimizer_prompt_logging():
+        with capture_optimizer_console(optimizer_console_path):
             candidate_program = compile_program(
                 optimizer_name,
                 optimizer,
@@ -1227,9 +1442,20 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
             append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile error", int(cfg.TRAIN_HISTORY_SIZE))
             (layout["debug"] / "compile_error.txt").write_text(f"{type(exc).__name__}: {exc}", encoding="utf-8")
             save_predictions(layout["debug"] / "predictions.json", {"baseline": baseline_results})
+        log_hint = (
+            f" Also inspect {optimizer_console_path}."
+            if optimizer_console_path is not None
+            else ""
+        )
         raise RuntimeError(
-            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt and DSPy history."
+            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt "
+            f"and DSPy history.{log_hint}"
         ) from exc
+
+    if report_type == "CTA" and _prompt_sha256(_base_prompt(report_type)) != base_prompt_hash:
+        raise RuntimeError(
+            "CTA_BASE_PROMPT changed during optimization. The candidate was not evaluated or saved."
+        )
 
     if layout is not None:
         append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile", int(cfg.TRAIN_HISTORY_SIZE))
@@ -1240,6 +1466,7 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
 
     candidate_signature = extract_program_instructions(candidate_program)
     candidate_effective = effective_prompt_text(report_type, candidate_signature)
+    candidate_new_terms = _candidate_terms_absent_from_base(candidate_signature, base_prompt) if base_prompt else []
     quality_ok, quality_reason = prompt_quality_ok(candidate_signature, report_type)
 
     acceptance_split = str(cfg.DSPY_ACCEPTANCE_SPLIT)
@@ -1279,6 +1506,17 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         "warm_started": warm_started,
         "warm_start_status": warm_start_status,
         "split_sizes": {name: len(values) for name, values in splits.items()},
+        "report_integrity": {
+            "full_report_text_logged": True,
+            "exact_report_guard_enabled": True,
+            "cta_base_prompt_guard_enabled": report_type == "CTA",
+            "ollama_num_ctx": int(cfg.DSPY_CONTEXT_WINDOW),
+            "task_max_output_tokens": int(cfg.DSPY_MAX_TOKENS),
+            "prompt_max_output_tokens": int(cfg.DSPY_PROMPT_MAX_TOKENS),
+            "maximum_loaded_report_characters": max(
+                len(_report_text_for_example(example)) for example in examples
+            ),
+        },
         "test_evaluated_this_iteration": evaluate_test,
         "search_metric_weights": {
             "exact": cfg.DSPY_SEARCH_EXACT_WEIGHT,
@@ -1294,9 +1532,20 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         "baseline_acceptance_promotion": baseline_accept.promotion_score,
         "candidate_acceptance_promotion": candidate_accept.promotion_score,
         "promotion_delta": promotion_delta,
-        "candidate_signature_prompt_chars": len(candidate_signature),
+        "experiment_name": getattr(cfg, "CTA_EXPERIMENT_NAME", None) if report_type == "CTA" else None,
+        "base_prompt_version": getattr(cfg, "CTA_BASE_PROMPT_VERSION", None) if report_type == "CTA" else None,
+        "base_prompt_sha256": base_prompt_hash or None,
+        "base_prompt_chars": len(base_prompt),
+        "base_prompt_unchanged": (
+            _prompt_sha256(_base_prompt(report_type)) == base_prompt_hash
+            if report_type == "CTA" else True
+        ),
+        "before_supplement_chars": len(before_signature),
+        "candidate_supplement_chars": len(candidate_signature),
+        "active_supplement_chars": len(candidate_signature if accepted else before_signature),
         "candidate_effective_prompt_chars": len(candidate_effective),
-        "fixed_rules_chars": len(_fixed_rules(report_type)),
+        "candidate_terms_absent_from_base": candidate_new_terms,
+        "supplement_update_mode": "replace_previous_supplement; never concatenate with base or prior candidates",
         "metrics": {
             "baseline": {name: summarize_eval(result) for name, result in baseline_results.items()},
             "candidate": {name: summarize_eval(result) for name, result in candidate_results.items()},
@@ -1312,11 +1561,20 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
             {"baseline": baseline_results, "candidate": candidate_results, "active_after": active_results},
         )
         (layout["prompts"] / "candidate_signature_prompt.txt").write_text(candidate_signature, encoding="utf-8")
+        (layout["prompts"] / "candidate_supplement.txt").write_text(candidate_signature, encoding="utf-8")
         candidate_prompt_path.write_text(candidate_effective, encoding="utf-8")
-        (layout["prompts"] / "fixed_rules.txt").write_text(_fixed_rules(report_type), encoding="utf-8")
+        if base_prompt:
+            (layout["prompts"] / "cta_base_prompt.txt").write_text(base_prompt, encoding="utf-8")
+            (layout["prompts"] / "candidate_terms_absent_from_base.json").write_text(
+                json.dumps(candidate_new_terms, indent=2), encoding="utf-8"
+            )
+        active_supplement = candidate_signature if accepted else before_signature
         (layout["prompts"] / "after_signature_prompt.txt").write_text(
-            candidate_signature if accepted else before_signature,
+            active_supplement,
             encoding="utf-8",
+        )
+        (layout["prompts"] / "active_supplement.txt").write_text(
+            active_supplement, encoding="utf-8"
         )
         (layout["prompts"] / "after_effective_prompt.txt").write_text(
             candidate_effective if accepted else before_effective,
@@ -1330,9 +1588,9 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
     print(f"Candidate accepted: {accepted}. {acceptance_reason}")
     print(saved_program_status)
     if candidate_prompt_path is not None:
-        print(f"Candidate prompt saved to: {candidate_prompt_path}")
+        print(f"Candidate effective prompt saved to: {candidate_prompt_path}")
     else:
-        print("Candidate prompt was not saved because TRAIN_SAVE_RUN_LOGS is disabled.")
+        print("Candidate supplement was not saved because TRAIN_SAVE_RUN_LOGS is disabled.")
     if run_dir is not None:
         print(f"Run artifacts: {run_dir}")
     return summary
@@ -1367,6 +1625,10 @@ def run_final_test_audit(iteration: int) -> Dict[str, Any]:
         "program_path": str(save_path),
         "loaded_saved_program": loaded,
         "load_status": status,
+        "experiment_name": getattr(cfg, "CTA_EXPERIMENT_NAME", None) if report_type == "CTA" else None,
+        "base_prompt_version": getattr(cfg, "CTA_BASE_PROMPT_VERSION", None) if report_type == "CTA" else None,
+        "base_prompt_sha256": _prompt_sha256(_base_prompt(report_type)) if report_type == "CTA" else None,
+        "active_supplement": extract_program_instructions(program) if report_type == "CTA" else None,
         "test": summarize_eval(result),
     }
     if cfg.TRAIN_SAVE_RUN_LOGS:
@@ -1374,6 +1636,13 @@ def run_final_test_audit(iteration: int) -> Dict[str, Any]:
         layout = make_layout(run_dir)
         save_split_debug(layout["debug"] / "split_examples.json", splits)
         save_predictions(layout["debug"] / "predictions.json", {"final_audit": {"test": result}})
+        if report_type == "CTA":
+            active_supplement = extract_program_instructions(program) or cfg.CTA_SIGNATURE_INSTRUCTIONS
+            (layout["prompts"] / "cta_base_prompt.txt").write_text(cfg.CTA_BASE_PROMPT, encoding="utf-8")
+            (layout["prompts"] / "active_supplement.txt").write_text(active_supplement, encoding="utf-8")
+            (layout["prompts"] / "active_effective_prompt.txt").write_text(
+                effective_prompt_text(report_type, active_supplement), encoding="utf-8"
+            )
         (layout["root"] / "final_test_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"Final audit artifacts: {run_dir}")
     return summary
