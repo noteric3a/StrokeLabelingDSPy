@@ -4,15 +4,11 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict
 
+from config import MODEL_NAME, OLLAMA_URL, REQUEST_TIMEOUT_SECONDS, NUM_PREDICT
 import config as cfg
 
-
-def _model_name() -> str:
-    return cfg.DSPY_MODEL.replace("ollama_chat/", "").replace("ollama/", "")
-
-
-def _ollama_url() -> str:
-    return cfg.DSPY_API_BASE.rstrip("/") + "/api/generate"
+# Optional config value. If NUM_CTX is missing, default to 8192.
+NUM_CTX = getattr(cfg, "NUM_CTX", 8192)
 
 
 def ollama_generate_sync(
@@ -20,30 +16,30 @@ def ollama_generate_sync(
     schema: Dict[str, Any],
     case_id: str,
     tag: str,
-    model: str | None = None,
+    model: str = MODEL_NAME,
     temperature: float = 0,
 ) -> str:
     payload = {
-        "model": model or _model_name(),
+        "model": model,
         "prompt": prompt,
         "format": schema,
         "stream": False,
         "think": False,
         "options": {
             "temperature": temperature,
-            "num_predict": cfg.DSPY_MAX_TOKENS,
-            "num_ctx": cfg.DSPY_CONTEXT_WINDOW,
+            "num_predict": NUM_PREDICT,
+            "num_ctx": NUM_CTX,
         },
     }
 
     req = urllib.request.Request(
-        _ollama_url(),
+        OLLAMA_URL,
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=cfg.OLLAMA_REQUEST_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as response:
             response_text = response.read().decode("utf-8")
             result = json.loads(response_text)
 
@@ -86,16 +82,16 @@ def ollama_generate_sync(
         raise RuntimeError(
             f"Ollama stopped due to length for case {case_id} [{tag}]. "
             f"prompt_eval_count={prompt_eval_count}, eval_count={eval_count}, "
-            f"num_ctx={cfg.DSPY_CONTEXT_WINDOW}, num_predict={cfg.DSPY_MAX_TOKENS}, "
+            f"num_ctx={NUM_CTX}, num_predict={NUM_PREDICT}, "
             f"partial_response={output[:200]!r}. "
-            f"Fix by increasing DSPY_CONTEXT_WINDOW or shortening the prompt."
+            f"Fix by increasing NUM_CTX or shortening the prompt."
         )
 
     if not output:
         raise RuntimeError(
             f"Ollama returned no output for case {case_id} [{tag}]. "
             f"done_reason={done_reason}, prompt_eval_count={prompt_eval_count}, "
-            f"eval_count={eval_count}, num_ctx={cfg.DSPY_CONTEXT_WINDOW}."
+            f"eval_count={eval_count}, num_ctx={NUM_CTX}."
         )
 
     return output
@@ -107,7 +103,7 @@ async def ollama_generate_async(
     case_id: str,
     tag: str,
     semaphore: asyncio.Semaphore,
-    model: str | None = None,
+    model: str = MODEL_NAME,
     temperature: float = 0,
 ) -> Dict[str, Any]:
     async with semaphore:

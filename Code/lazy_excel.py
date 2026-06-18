@@ -1,3 +1,5 @@
+"""Lazy Excel loading utilities to minimize memory footprint."""
+
 from typing import Generator, Dict, Any
 import pandas as pd
 from pathlib import Path
@@ -23,8 +25,7 @@ class LazyExcelReader:
     def _get_total_rows(self) -> None:
         """Get total row count without loading entire file."""
         try:
-            df = pd.read_excel(self.filepath, sheet_name=self.sheet_name, nrows=1)
-            # Load all to count (pandas limitation), but we minimize this
+            # Load all to count (pandas limitation), but release it immediately.
             full_df = pd.read_excel(self.filepath, sheet_name=self.sheet_name)
             self.total_rows = len(full_df)
             del full_df  # Free memory immediately

@@ -14,12 +14,21 @@ import config as cfg
 from utils import normalize_labels
 
 
-DEFAULT_CONFIDENCE_RUNS = cfg.CONFIDENCE_ATTEMPTS
-DEFAULT_CONFIDENCE_TEMPERATURE = cfg.CONFIDENCE_SAMPLE_TEMPERATURE
-DEFAULT_MIN_CONFIDENCE_PERCENTAGE = cfg.CONFIDENCE_THRESHOLD_PERCENTAGE
+DEFAULT_CONFIDENCE_RUNS = 10
+DEFAULT_CONFIDENCE_TEMPERATURE = 0.2
+DEFAULT_MIN_CONFIDENCE_PERCENTAGE = 70.0
 LOWEST_ALLOWED_MIN_CONFIDENCE_PERCENTAGE = 51.0
 
-LABEL_ORDER = cfg.LABEL_ORDER
+LABEL_ORDER = [
+    "NONE",
+    "RMCA", "LMCA",
+    "RACA", "LACA",
+    "RPCA", "LPCA",
+    "RPICA", "LPICA",
+    "BA",
+    "RVA", "LVA",
+    "RICA", "LICA",
+]
 
 
 def confidence_checking_enabled() -> bool:
@@ -29,7 +38,7 @@ def confidence_checking_enabled() -> bool:
 
 def confidence_run_count() -> int:
     """Return number of repeated model samples to run in confidence mode."""
-    raw_value = getattr(cfg, "CONFIDENCE_ATTEMPTS", DEFAULT_CONFIDENCE_RUNS)
+    raw_value = getattr(cfg, "CONFIDENCE_RUNS", DEFAULT_CONFIDENCE_RUNS)
     try:
         runs = int(raw_value)
     except (TypeError, ValueError):
@@ -39,7 +48,7 @@ def confidence_run_count() -> int:
 
 def confidence_temperature() -> float:
     """Return model temperature used for confidence sampling."""
-    raw_value = getattr(cfg, "CONFIDENCE_SAMPLE_TEMPERATURE", DEFAULT_CONFIDENCE_TEMPERATURE)
+    raw_value = getattr(cfg, "CONFIDENCE_TEMPERATURE", DEFAULT_CONFIDENCE_TEMPERATURE)
     try:
         temperature = float(raw_value)
     except (TypeError, ValueError):
@@ -53,7 +62,7 @@ def min_confidence_percentage() -> float:
     A blank config value falls back to DEFAULT_MIN_CONFIDENCE_PERCENTAGE. Values
     below 51 are raised to 51 so the winner must have at least a majority.
     """
-    raw_value = getattr(cfg, "CONFIDENCE_THRESHOLD_PERCENTAGE", "")
+    raw_value = getattr(cfg, "MIN_CONFIDENCE_PERCENTAGE", "")
     if raw_value is None or str(raw_value).strip() == "":
         threshold = DEFAULT_MIN_CONFIDENCE_PERCENTAGE
     else:
