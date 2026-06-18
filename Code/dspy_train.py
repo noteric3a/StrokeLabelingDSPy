@@ -25,6 +25,7 @@ import io
 import json
 import logging
 import math
+import os
 import random
 import re
 from collections import Counter, defaultdict
@@ -576,6 +577,26 @@ def disable_training_caches() -> None:
         dspy.settings.configure(cache=False)
     except Exception:
         pass
+
+
+@contextlib.contextmanager
+def capture_optimizer_console(path: Optional[Path]):
+    """Keep optimizer-generated prompt bodies out of the terminal.
+
+    MIPROv2 and GEPA may print complete proposed instructions while compiling.
+    Redirect stdout and stderr to a run log instead. If run logging is disabled,
+    discard the optimizer's internal console output.
+    """
+    if path is None:
+        with open(os.devnull, "w", encoding="utf-8") as sink:
+            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+                yield
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", buffering=1) as sink:
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            yield
 
 
 def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> Any:
@@ -1184,25 +1205,42 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         return summary
 
     optimizer_name, optimizer = build_optimizer(run_dir)
+    optimizer_console_path = (
+        layout["debug"] / "optimizer_console.log"
+        if layout is not None
+        else None
+    )
     print(
         f"{optimizer_name.upper()} will train on {len(splits['train'])} examples and "
         f"search on {len(splits['optimizer_val'])} optimizer-validation examples."
     )
+    if optimizer_console_path is not None:
+        print(f"Optimizer console output saved to: {optimizer_console_path}")
+    else:
+        print("Optimizer console output is hidden because TRAIN_SAVE_RUN_LOGS is disabled.")
+
     try:
-        candidate_program = compile_program(
-            optimizer_name,
-            optimizer,
-            program,
-            splits["train"],
-            splits["optimizer_val"],
-        )
+        with capture_optimizer_console(optimizer_console_path):
+            candidate_program = compile_program(
+                optimizer_name,
+                optimizer,
+                program,
+                splits["train"],
+                splits["optimizer_val"],
+            )
     except Exception as exc:
         if layout is not None:
             append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile error", int(cfg.TRAIN_HISTORY_SIZE))
             (layout["debug"] / "compile_error.txt").write_text(f"{type(exc).__name__}: {exc}", encoding="utf-8")
             save_predictions(layout["debug"] / "predictions.json", {"baseline": baseline_results})
+        log_hint = (
+            f" Also inspect {optimizer_console_path}."
+            if optimizer_console_path is not None
+            else ""
+        )
         raise RuntimeError(
-            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt and DSPy history."
+            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt "
+            f"and DSPy history.{log_hint}"
         ) from exc
 
     if layout is not None:
@@ -1278,13 +1316,15 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         },
     }
 
+    candidate_prompt_path: Optional[Path] = None
     if layout is not None:
+        candidate_prompt_path = layout["prompts"] / "candidate_effective_prompt.txt"
         save_predictions(
             layout["debug"] / "predictions.json",
             {"baseline": baseline_results, "candidate": candidate_results, "active_after": active_results},
         )
         (layout["prompts"] / "candidate_signature_prompt.txt").write_text(candidate_signature, encoding="utf-8")
-        (layout["prompts"] / "candidate_effective_prompt.txt").write_text(candidate_effective, encoding="utf-8")
+        candidate_prompt_path.write_text(candidate_effective, encoding="utf-8")
         (layout["prompts"] / "fixed_rules.txt").write_text(_fixed_rules(report_type), encoding="utf-8")
         (layout["prompts"] / "after_signature_prompt.txt").write_text(
             candidate_signature if accepted else before_signature,
@@ -1301,6 +1341,10 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
 
     print(f"Candidate accepted: {accepted}. {acceptance_reason}")
     print(saved_program_status)
+    if candidate_prompt_path is not None:
+        print(f"Candidate prompt saved to: {candidate_prompt_path}")
+    else:
+        print("Candidate prompt was not saved because TRAIN_SAVE_RUN_LOGS is disabled.")
     if run_dir is not None:
         print(f"Run artifacts: {run_dir}")
     return summary
