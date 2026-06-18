@@ -1,20 +1,18 @@
-"""
-dspy_train.py
+"""Optimize CT, CTA, or CTP DSPy programs using config.py settings.
 
-DSPy optimization script for CT / CTA / CTP stroke-territory labelers.
+The only command-line option is ``--loop``.  Every other setting is controlled
+from config.py so repeated experiments are reproducible and easy to compare.
 
-Safety and debugging design:
-- The model-visible DSPy Example objects contain report_text only.
-- Ground-truth labels are kept in Python-only maps and used only by metrics/logs.
-- By default MIPRO runs without labeled or bootstrapped demos to prevent answer leakage.
-- Prompt candidates are evaluated on the 28-case train split by default so the optimizer
-  does not make decisions from only the 6-case dev split.
-- CTA rule text is passed as a fixed input, so MIPRO can optimize guidance
-  without deleting required CTA vessel/label rules.
-- By default, training warm-starts from the saved optimized program when it exists.
-- In --loop mode, each accepted candidate becomes the next iteration's starting prompt.
-- Rejected candidates do not overwrite the saved best program.
-- Candidate acceptance is based on the configured optimizer score, not just raw prompt length.
+Accuracy-oriented design:
+- supervised training examples expose reference labels as DSPy output fields,
+  never as task-model inputs;
+- a stratified four-way split separates prompt training, optimizer validation,
+  promotion, and final testing;
+- DSPy receives a dense exact/F1 search reward;
+- a candidate replaces the saved best program only when its promotion score
+  improves without regressing exact accuracy;
+- accepted programs warm-start the next ``--loop`` iteration;
+- the final test set is not used for prompt search or promotion.
 """
 
 from __future__ import annotations
@@ -22,61 +20,32 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import inspect
 import io
 import json
 import logging
+import math
 import random
 import re
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 import dspy
 import pandas as pd
 
 import config as cfg
-from dspy_programs import configure_dspy, CTLabeler, CTALabeler, CTPLabeler
+from dspy_programs import CTALabeler, CTLabeler, CTPLabeler, configure_dspy
 from utils import normalize_labels
 
-# Hide noisy internal DSPy/MIPRO warnings such as:
-# "Input contains fields not in signature. These fields will be ignored..."
-# Those warnings come from MIPRO's internal instruction-proposal modules, not from
-# the stroke-labeling predictor itself.
 logging.getLogger("dspy.predict.predict").setLevel(logging.ERROR)
 
 
-def disable_training_caches() -> None:
-    """Ensure DSPy training/evaluation does not reuse cached LM completions.
-
-    The project ProcessingCache in cache.py is for main labeling runs and is not
-    imported here.  This function only handles DSPy's optional LM cache layer.
-    """
-    configure_cache = getattr(dspy, "configure_cache", None)
-    if callable(configure_cache):
-        try:
-            configure_cache(enable_memory_cache=False, enable_disk_cache=False)
-        except TypeError:
-            try:
-                configure_cache(enable_disk_cache=False, enable_memory_cache=False)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    try:
-        dspy.settings.configure(cache=False)
-    except Exception:
-        pass
-
-
-
-
 # =============================================================================
-# Python-only answer-key store
+# Reference-label lookup
 # =============================================================================
-# These maps let the metric/evaluator use the answer key WITHOUT storing gold
-# labels inside dspy.Example objects.  Only report_text is passed to the model.
 
 _GOLD_BY_REPORT_KEY: Dict[str, str] = {}
 _RAW_GOLD_BY_REPORT_KEY: Dict[str, Any] = {}
@@ -84,40 +53,17 @@ _CASE_ID_BY_REPORT_KEY: Dict[str, str] = {}
 
 
 def _report_key(report_text: Any) -> str:
-    """Stable key for matching an Example's report text to Python-only gold labels."""
     return " ".join(str(report_text or "").split())
 
 
-def _example_value(example: Any, field: str, default: Any = "") -> Any:
-    """Read a DSPy Example field without accidentally returning bound methods."""
+def _value(obj: Any, field: str, default: Any = "") -> Any:
     for reader in (
-        lambda obj: obj[field],
-        lambda obj: obj.get(field),
-        lambda obj: getattr(obj, field),
+        lambda item: item[field],
+        lambda item: item.get(field),
+        lambda item: getattr(item, field),
     ):
         try:
-            value = reader(example)
-        except Exception:
-            continue
-        if not callable(value):
-            return value
-    return default
-
-
-def _prediction_value(pred: Any, field: str, default: Any = "") -> Any:
-    """Read a DSPy Prediction field safely.
-
-    DSPy Prediction/Example classes may expose methods named labels/reasoning.
-    Using getattr(pred, "labels") can therefore return a bound method instead of
-    the predicted value.  Always prefer mapping-style access.
-    """
-    for reader in (
-        lambda obj: obj[field],
-        lambda obj: obj.get(field),
-        lambda obj: getattr(obj, field),
-    ):
-        try:
-            value = reader(pred)
+            value = reader(obj)
         except Exception:
             continue
         if not callable(value):
@@ -126,7 +72,7 @@ def _prediction_value(pred: Any, field: str, default: Any = "") -> Any:
 
 
 def _report_text_for_example(example: Any) -> str:
-    return str(_example_value(example, "report_text", "") or "")
+    return str(_value(example, "report_text", "") or "")
 
 
 def _case_id_for_example(example: Any) -> str:
@@ -134,26 +80,25 @@ def _case_id_for_example(example: Any) -> str:
 
 
 def _raw_gold_for_example(example: Any) -> Any:
+    direct = _value(example, "labels", None)
+    if direct is not None and str(direct).strip():
+        return direct
     return _RAW_GOLD_BY_REPORT_KEY.get(_report_key(_report_text_for_example(example)), "NONE")
 
 
 def _gold_labels_for_example(example: Any) -> Set[str]:
-    return normalize_gt(_GOLD_BY_REPORT_KEY.get(_report_key(_report_text_for_example(example)), "NONE"))
+    return normalize_gt(_raw_gold_for_example(example))
 
 
 # =============================================================================
-# Normalization helpers
+# Normalization and metrics
 # =============================================================================
 
 
 def normalize_gt(value: Any) -> Set[str]:
-    """Normalize a ground-truth label cell into a set of uppercase labels."""
-    if pd.isna(value):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
         return {"NONE"}
-    text = str(value).strip()
-    if not text or text.lower() in {"negative", "normal", "none"}:
-        return {"NONE"}
-    labels = {part.strip().upper() for part in text.split(",") if part.strip()}
+    labels = set(normalize_labels(value))
     if not labels:
         return {"NONE"}
     if "NONE" in labels and len(labels) > 1:
@@ -165,52 +110,229 @@ def normalize_pred(value: Any) -> Set[str]:
     labels = set(normalize_labels(value))
     if "NONE" in labels and len(labels) > 1:
         labels.remove("NONE")
-    return labels
+    return labels or {"NONE"}
 
 
 def normalize_case_id(value: Any) -> str:
-    if pd.isna(value):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
     text = str(value).strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return text
+    return text[:-2] if text.endswith(".0") else text
+
+
+def _raw_label_tokens(value: Any) -> List[str]:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return []
+    if isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        text = str(value).strip()
+        if not text:
+            return []
+        raw_items: Any = None
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                parsed = ast.literal_eval(text)
+                if isinstance(parsed, (list, tuple, set)):
+                    raw_items = list(parsed)
+            except Exception:
+                raw_items = None
+        if raw_items is None:
+            raw_items = re.split(r"[,;\n/]+", text)
+
+    tokens: List[str] = []
+    for item in raw_items:
+        token = str(item).strip().upper().strip("\"'[](){}")
+        token = re.sub(r"\s+", " ", token)
+        token = re.sub(r"^(LABELS?|FINAL LABELS?|OUTPUT)\s*:\s*", "", token).strip()
+        if token:
+            tokens.append(token)
+    return tokens
+
+
+def raw_label_format_ok(value: Any) -> bool:
+    tokens = _raw_label_tokens(value)
+    if not tokens:
+        return False
+
+    normalized_tokens: List[str] = []
+    allowed = set(cfg.ALLOWED_LABELS)
+    for token in tokens:
+        label = cfg.LABEL_ALIASES.get(token, token)
+        compact = label.replace(" ", "")
+        if compact in allowed:
+            label = compact
+        if label not in allowed:
+            return False
+        normalized_tokens.append(label)
+    return not ("NONE" in normalized_tokens and len(set(normalized_tokens)) > 1)
+
+
+def _label_f1(gold: Set[str], predicted: Set[str]) -> float:
+    if gold == predicted:
+        return 1.0
+    overlap = len(gold & predicted)
+    if overlap == 0:
+        return 0.0
+    precision = overlap / len(predicted)
+    recall = overlap / len(gold)
+    return 2.0 * precision * recall / (precision + recall)
+
+
+def _weighted_score(exact: float, f1: float, *, exact_weight: float, f1_weight: float) -> float:
+    total = exact_weight + f1_weight
+    if total <= 0:
+        raise ValueError("Metric weights must sum to a positive value.")
+    return (exact_weight * exact + f1_weight * f1) / total
+
+
+@dataclass(frozen=True)
+class MetricParts:
+    format_ok: bool
+    exact: float
+    f1: float
+    search: float
+    promotion: float
+
+
+def metric_parts(example: Any, pred: Any) -> MetricParts:
+    raw_labels = _value(pred, "labels", "")
+    format_ok = raw_label_format_ok(raw_labels)
+    gold = _gold_labels_for_example(example)
+    predicted = normalize_pred(raw_labels)
+
+    exact = 1.0 if format_ok and gold == predicted else 0.0
+    f1 = _label_f1(gold, predicted) if format_ok else 0.0
+    search = _weighted_score(
+        exact,
+        f1,
+        exact_weight=float(cfg.DSPY_SEARCH_EXACT_WEIGHT),
+        f1_weight=float(cfg.DSPY_SEARCH_F1_WEIGHT),
+    )
+    promotion = _weighted_score(
+        exact,
+        f1,
+        exact_weight=float(cfg.DSPY_PROMOTION_EXACT_WEIGHT),
+        f1_weight=float(cfg.DSPY_PROMOTION_F1_WEIGHT),
+    )
+    return MetricParts(format_ok=format_ok, exact=exact, f1=f1, search=search, promotion=promotion)
+
+
+def optimizer_metric(example: Any, pred: Any, trace: Any = None) -> float:
+    """Dense scalar reward used by MIPROv2."""
+    del trace
+    return metric_parts(example, pred).search
+
+
+def gepa_feedback_metric(
+    gold: Any,
+    pred: Any,
+    trace: Any = None,
+    pred_name: Optional[str] = None,
+    pred_trace: Any = None,
+) -> Any:
+    """Dense reward plus actionable missing/extra-label feedback for GEPA."""
+    del trace, pred_name, pred_trace
+    parts = metric_parts(gold, pred)
+    expected = _gold_labels_for_example(gold)
+    raw_labels = _value(pred, "labels", "")
+    predicted = normalize_pred(raw_labels)
+
+    if not parts.format_ok:
+        feedback = (
+            f"Invalid labels field {raw_labels!r}. Use only allowed labels {cfg.ALLOWED_LABELS}; "
+            "NONE cannot be combined with a positive label. "
+            f"Expected labels for this report: {sorted(expected)}."
+        )
+    elif parts.exact == 1.0:
+        feedback = "The labels exactly match the reference answer and the output format is valid."
+    else:
+        missing = sorted(expected - predicted)
+        extra = sorted(predicted - expected)
+        feedback = (
+            f"Expected {sorted(expected)} but predicted {sorted(predicted)}. "
+            f"Missing labels: {missing or 'none'}. Extra labels: {extra or 'none'}. "
+            "Revise the instruction to correct this vessel/laterality/policy decision without breaking cases that already match."
+        )
+
+    prediction_cls = getattr(dspy, "Prediction", None)
+    if prediction_cls is None:
+        return {"score": parts.search, "feedback": feedback}
+    return prediction_cls(score=parts.search, feedback=feedback)
+
+
+# =============================================================================
+# Configuration validation
+# =============================================================================
+
+
+def validate_training_config() -> None:
+    report_type = str(cfg.TRAIN_REPORT_TYPE).upper().strip()
+    if report_type not in {"CT", "CTA", "CTP"}:
+        raise ValueError("TRAIN_REPORT_TYPE must be CT, CTA, or CTP.")
+
+    ratios = dict(cfg.TRAIN_SPLIT_RATIOS)
+    required = {"train", "optimizer_val", "dev", "test"}
+    if set(ratios) != required:
+        raise ValueError(f"TRAIN_SPLIT_RATIOS must contain exactly {sorted(required)}.")
+    if any(float(value) <= 0 for value in ratios.values()):
+        raise ValueError("Every TRAIN_SPLIT_RATIOS value must be positive.")
+    if not math.isclose(sum(float(value) for value in ratios.values()), 1.0, abs_tol=1e-9):
+        raise ValueError("TRAIN_SPLIT_RATIOS values must sum to 1.0.")
+
+    for pair in (
+        (cfg.DSPY_SEARCH_EXACT_WEIGHT, cfg.DSPY_SEARCH_F1_WEIGHT),
+        (cfg.DSPY_PROMOTION_EXACT_WEIGHT, cfg.DSPY_PROMOTION_F1_WEIGHT),
+    ):
+        if float(pair[0]) < 0 or float(pair[1]) < 0 or float(pair[0]) + float(pair[1]) <= 0:
+            raise ValueError("Metric weights must be nonnegative and sum to more than zero.")
+
+    optimizer_name = str(cfg.DSPY_OPTIMIZER).lower().strip()
+    if optimizer_name not in {"mipro", "miprov2", "gepa"}:
+        raise ValueError("DSPY_OPTIMIZER must be 'mipro' or 'gepa'.")
+
+    if str(cfg.DSPY_ACCEPTANCE_SPLIT) not in ratios:
+        raise ValueError("DSPY_ACCEPTANCE_SPLIT must name one of the configured splits.")
+    if str(cfg.DSPY_ACCEPTANCE_SPLIT) == "test":
+        raise ValueError("The final test split cannot be used as the promotion split.")
+
+
+# =============================================================================
+# Spreadsheet loading
+# =============================================================================
 
 
 def _normalize_col_name(name: Any) -> str:
     return " ".join(str(name).strip().lower().replace("_", " ").split())
 
 
-def _find_column(df: pd.DataFrame, candidates: Sequence[str], *, purpose: str) -> str:
-    existing = list(df.columns)
-    for col in candidates:
-        if col in df.columns:
-            return col
-    normalized_existing = {_normalize_col_name(col): col for col in existing}
-    for col in candidates:
-        key = _normalize_col_name(col)
-        if key in normalized_existing:
-            return normalized_existing[key]
+def _find_column(dataframe: pd.DataFrame, candidates: Sequence[str], *, purpose: str) -> str:
+    for column in candidates:
+        if column in dataframe.columns:
+            return column
+    normalized = {_normalize_col_name(column): column for column in dataframe.columns}
+    for candidate in candidates:
+        match = normalized.get(_normalize_col_name(candidate))
+        if match is not None:
+            return match
     raise ValueError(
-        f"Could not find {purpose} column.\n"
-        f"Tried: {list(candidates)}\n"
-        f"Available columns: {existing}"
+        f"Could not find {purpose}. Tried {list(candidates)}. "
+        f"Available columns: {list(dataframe.columns)}"
     )
 
 
 def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
     seen: Set[str] = set()
-    out: List[str] = []
+    result: List[str] = []
     for value in values:
         if value and value not in seen:
             seen.add(value)
-            out.append(value)
-    return out
+            result.append(value)
+    return result
 
 
 def _report_column_candidates(report_type: str) -> List[str]:
-    report_type = report_type.upper()
-    training = cfg.TRAINING_COLUMN_CANDIDATES.get(report_type, {}).get("report", [])
+    training = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["report"]
     report_like = cfg.REPORT_COLUMN_CANDIDATES.get(f"{report_type}_Report", [])
     return _dedupe_keep_order([
         *training,
@@ -224,301 +346,16 @@ def _report_column_candidates(report_type: str) -> List[str]:
 
 
 def _gt_column_candidates(report_type: str) -> List[str]:
-    report_type = report_type.upper()
-    training = cfg.TRAINING_COLUMN_CANDIDATES.get(report_type, {}).get("ground_truth", [])
-    modality = []
-    if hasattr(cfg, "MODALITY_COLUMN_CANDIDATES"):
-        modality = list(cfg.MODALITY_COLUMN_CANDIDATES.get(report_type, {}).get("ground_truth", []))
+    training = cfg.TRAINING_COLUMN_CANDIDATES[report_type]["ground_truth"]
     return _dedupe_keep_order([
         *training,
-        *modality,
         f"{report_type} GT",
         f"{report_type}_GT",
+        f"{report_type}.GT",
+        f"{report_type}GT",
         f"{report_type} Ground Truth",
-        f"{report_type}_Ground_Truth",
         report_type,
     ])
-
-
-def _signature_instructions(report_type: str) -> str:
-    """Return the optimizable DSPy signature instruction for a modality."""
-    report_type = report_type.upper()
-    if report_type == "CT":
-        return getattr(cfg, "CT_SIGNATURE_INSTRUCTIONS", "")
-    if report_type == "CTA":
-        return getattr(cfg, "CTA_SIGNATURE_INSTRUCTIONS", "")
-    if report_type == "CTP":
-        return getattr(cfg, "CTP_SIGNATURE_INSTRUCTIONS", "")
-    return ""
-
-
-def _fixed_rules_for_report_type(report_type: str) -> str:
-    """Return non-optimizable rules supplied as normal model inputs."""
-    report_type = report_type.upper()
-    if report_type == "CTA":
-        return getattr(cfg, "CTA_FIXED_RULES", "")
-    return ""
-
-
-def effective_prompt_text(report_type: str, signature_instructions: Optional[str] = None) -> str:
-    """Human-readable prompt text actually seen by the model.
-
-    For CTA, MIPRO only rewrites the short signature instruction. The CTA rule
-    block is supplied by CTALabeler.forward as `cta_rules`, so prompt logs should
-    show both pieces together. This prevents a short optimized signature from
-    looking like the whole CTA prompt.
-    """
-    report_type = report_type.upper()
-    instruction = _signature_instructions(report_type) if signature_instructions is None else str(signature_instructions or "")
-    fixed_rules = _fixed_rules_for_report_type(report_type)
-    if fixed_rules:
-        return (
-            f"{instruction.strip()}\n\n"
-            f"Fixed {report_type} rules supplied as a non-optimizable input:\n"
-            f"{fixed_rules.strip()}"
-        ).strip()
-    return instruction.strip()
-
-
-# =============================================================================
-# DSPy metric
-# =============================================================================
-
-
-def _raw_label_tokens(value: Any) -> List[str]:
-    """Return the raw tokens the model placed in the labels field."""
-    if value is None:
-        return []
-    if isinstance(value, float) and pd.isna(value):
-        return []
-    if isinstance(value, (list, tuple, set)):
-        raw_items = list(value)
-    else:
-        text = str(value).strip()
-        if not text:
-            return []
-        raw_items = None
-        if text.startswith("[") and text.endswith("]"):
-            try:
-                parsed = ast.literal_eval(text)
-                if isinstance(parsed, (list, tuple, set)):
-                    raw_items = list(parsed)
-            except Exception:
-                raw_items = None
-        if raw_items is None:
-            raw_items = re.split(r"[,;\n/]+", text)
-
-    tokens: List[str] = []
-    for item in raw_items:
-        token = str(item).strip().upper()
-        token = token.strip("\"'[](){}")
-        token = re.sub(r"\s+", " ", token)
-        token = re.sub(r"^(LABELS?|FINAL LABELS?|OUTPUT)\s*:\s*", "", token).strip()
-        if token:
-            tokens.append(token)
-    return tokens
-
-
-def raw_label_format_ok(value: Any) -> bool:
-    """Require the labels field to contain only allowed labels/aliases.
-
-    The old metric normalized away invalid outputs such as "MCA, NONE". That
-    made unusable test outputs look correct when the normalized result matched
-    gold. This check keeps optimization honest.
-    """
-    tokens = _raw_label_tokens(value)
-    if not tokens:
-        return False
-
-    normalized_tokens: List[str] = []
-    allowed = set(getattr(cfg, "ALLOWED_LABELS", []))
-    aliases = getattr(cfg, "LABEL_ALIASES", {})
-    for token in tokens:
-        label = aliases.get(token, token)
-        compact = label.replace(" ", "")
-        if compact in allowed:
-            label = compact
-        if label not in allowed:
-            return False
-        normalized_tokens.append(label)
-
-    return not ("NONE" in normalized_tokens and len(set(normalized_tokens)) > 1)
-
-
-def exact_match_metric(example, pred, trace=None) -> float:
-    """Return 1.0 only when predicted labels exactly match hidden gold labels."""
-    gold = _gold_labels_for_example(example)
-    predicted = normalize_pred(_prediction_value(pred, "labels", "NONE"))
-    return 1.0 if gold == predicted else 0.0
-
-
-def strict_exact_match_metric(example, pred, trace=None) -> float:
-    """Exact match plus strict validation of the raw labels field."""
-    raw_labels = _prediction_value(pred, "labels", "NONE")
-    if not raw_label_format_ok(raw_labels):
-        return 0.0
-    return exact_match_metric(example, pred, trace=trace)
-
-
-def label_f1_metric(example, pred, trace=None) -> float:
-    """Dense label-overlap metric with strict raw-label validation."""
-    raw_labels = _prediction_value(pred, "labels", "NONE")
-    if not raw_label_format_ok(raw_labels):
-        return 0.0
-
-    gold = _gold_labels_for_example(example)
-    predicted = normalize_pred(raw_labels)
-    if not predicted:
-        return 0.0
-    if gold == predicted:
-        return 1.0
-
-    overlap = len(gold & predicted)
-    if overlap == 0:
-        return 0.0
-    precision = overlap / len(predicted)
-    recall = overlap / len(gold)
-    return 2 * precision * recall / (precision + recall)
-
-
-def optimizer_metric(example, pred, trace=None) -> float:
-    metric_name = str(getattr(cfg, "DSPY_OPTIMIZER_METRIC", "strict_exact") or "strict_exact").lower().strip()
-    if metric_name in {"exact", "exact_match", "accuracy"}:
-        return exact_match_metric(example, pred, trace=trace)
-    if metric_name in {"strict", "strict_exact", "strict_exact_match"}:
-        return strict_exact_match_metric(example, pred, trace=trace)
-    if metric_name in {"label_f1", "f1", "overlap"}:
-        return label_f1_metric(example, pred, trace=trace)
-    raise ValueError(f"Unknown DSPY_OPTIMIZER_METRIC: {metric_name}")
-
-
-# =============================================================================
-# DSPy optimizer helpers
-# =============================================================================
-
-
-def _mipro_v2_class():
-    try:
-        return dspy.MIPROv2
-    except ImportError as exc:
-        raise ImportError(
-            "MIPROv2 requires optuna. Install it with: pip install \"dspy[optuna]\" "
-            "or run this script with --baseline-only while debugging predictions."
-        ) from exc
-    except AttributeError:
-        try:
-            from dspy.teleprompt import MIPROv2
-            return MIPROv2
-        except ImportError as exc:
-            raise ImportError(
-                "MIPROv2 requires optuna. Install it with: pip install \"dspy[optuna]\" "
-                "or run this script with --baseline-only while debugging predictions."
-            ) from exc
-
-
-def _optional_prompt_model():
-    """Return a separate prompt-proposal LM when configured."""
-    model_name = getattr(cfg, "DSPY_PROMPT_MODEL", None)
-    if not model_name:
-        return None
-
-    lm_kwargs = dict(
-        api_base=getattr(cfg, "DSPY_PROMPT_MODEL_API_BASE", cfg.DSPY_API_BASE),
-        temperature=getattr(cfg, "DSPY_TEMPERATURE", 0.2),
-        max_tokens=int(getattr(cfg, "DSPY_PROMPT_MODEL_MAX_TOKENS", 4000)),
-        think=False,
-    )
-    if bool(getattr(cfg, "DSPY_DISABLE_CACHE", True)):
-        lm_kwargs["cache"] = False
-    try:
-        return dspy.LM(model_name, **lm_kwargs)
-    except TypeError:
-        lm_kwargs.pop("cache", None)
-        lm_kwargs.pop("think", None)
-        return dspy.LM(model_name, **lm_kwargs)
-
-
-def get_optimizer(metric, *, run_dir: Optional[Path] = None):
-    MIPROv2 = _mipro_v2_class()
-    kwargs = {
-        "metric": metric,
-        "auto": getattr(cfg, "DSPY_MIPRO_AUTO", "light"),
-        "init_temperature": float(getattr(cfg, "DSPY_MIPRO_INIT_TEMPERATURE", 0.7)),
-        "verbose": bool(getattr(cfg, "DSPY_MIPRO_VERBOSE", False)),
-        "track_stats": True,
-    }
-    prompt_model = _optional_prompt_model()
-    if prompt_model is not None:
-        kwargs["prompt_model"] = prompt_model
-    if run_dir is not None:
-        kwargs["log_dir"] = str(run_dir / "mipro_logs")
-
-    try:
-        return MIPROv2(**kwargs)
-    except TypeError:
-        # Older DSPy versions may not accept every convenience kwarg.
-        for optional_key in ("track_stats", "log_dir", "verbose", "init_temperature"):
-            kwargs.pop(optional_key, None)
-        return MIPROv2(**kwargs)
-
-
-def choose_optimizer_valset(trainset, devset, testset, source: str):
-    source = (source or "train").lower().strip()
-    if source == "train":
-        return trainset
-    if source == "dev":
-        return devset
-    if source == "train_dev":
-        return list(trainset) + list(devset)
-    if source == "all":
-        return list(trainset) + list(devset) + list(testset)
-    raise ValueError("--mipro-valset-source must be one of: train, dev, train_dev, all")
-
-
-def compile_with_no_answer_leak(optimizer, program, trainset, optimizer_valset, *, allow_demos: bool = False):
-    """Compile while keeping answer-key labels out of all model prompts."""
-    compile_kwargs = {
-        "trainset": trainset,
-        "valset": optimizer_valset,
-        "program_aware_proposer": bool(getattr(cfg, "DSPY_MIPRO_PROGRAM_AWARE_PROPOSER", True)),
-        "data_aware_proposer": bool(getattr(cfg, "DSPY_MIPRO_DATA_AWARE_PROPOSER", True)),
-        "tip_aware_proposer": bool(getattr(cfg, "DSPY_MIPRO_TIP_AWARE_PROPOSER", False)),
-        "fewshot_aware_proposer": bool(getattr(cfg, "DSPY_MIPRO_FEWSHOT_AWARE_PROPOSER", False)),
-        "view_data_batch_size": int(getattr(cfg, "DSPY_MIPRO_VIEW_DATA_BATCH_SIZE", 20)),
-    }
-    if not allow_demos and bool(getattr(cfg, "DSPY_INSTRUCTION_ONLY_OPTIMIZATION", True)):
-        compile_kwargs.update({
-            "max_bootstrapped_demos": int(getattr(cfg, "DSPY_MAX_BOOTSTRAPPED_DEMOS", 0)),
-            "max_labeled_demos": int(getattr(cfg, "DSPY_MAX_LABELED_DEMOS", 0)),
-        })
-    try:
-        return optimizer.compile(program.deepcopy(), **compile_kwargs)
-    except TypeError as exc:
-        message = str(exc)
-        if not allow_demos and any(k in message for k in ("max_bootstrapped_demos", "max_labeled_demos")):
-            raise TypeError(
-                "This DSPy/MIPROv2 version did not accept max_bootstrapped_demos=0 "
-                "and max_labeled_demos=0. Stopping instead of falling back because "
-                "fallback could create few-shot demos. Upgrade DSPy or rerun with "
-                "--allow-demos if you accept model-generated demos."
-            ) from exc
-        proposer_keys = {
-            "program_aware_proposer",
-            "data_aware_proposer",
-            "tip_aware_proposer",
-            "fewshot_aware_proposer",
-            "view_data_batch_size",
-        }
-        if any(key in message for key in proposer_keys):
-            for key in proposer_keys:
-                compile_kwargs.pop(key, None)
-            return optimizer.compile(program.deepcopy(), **compile_kwargs)
-        raise
-
-
-# =============================================================================
-# Loading examples from separate reports + ground-truth files
-# =============================================================================
 
 
 def load_examples(
@@ -526,12 +363,9 @@ def load_examples(
     ground_truth_file: str,
     report_type: str,
     max_cases: Optional[int] = None,
-) -> List[dspy.Example]:
-    """Load report-only DSPy Examples and store answer key in Python-only maps."""
+) -> List[Any]:
+    """Load supervised DSPy examples with labels marked as output fields."""
     report_type = report_type.upper()
-    if report_type not in {"CT", "CTA", "CTP"}:
-        raise ValueError("report_type must be CT, CTA, or CTP")
-
     reports_path = Path(reports_file)
     gt_path = Path(ground_truth_file)
     if not reports_path.exists():
@@ -544,8 +378,16 @@ def load_examples(
 
     reports_case_col = _find_column(reports_df, cfg.CASE_ID_COLUMNS, purpose="case ID in reports file")
     gt_case_col = _find_column(gt_df, cfg.CASE_ID_COLUMNS, purpose="case ID in ground-truth file")
-    report_col = _find_column(reports_df, _report_column_candidates(report_type), purpose=f"{report_type} report text in reports file")
-    gt_col = _find_column(gt_df, _gt_column_candidates(report_type), purpose=f"{report_type} ground-truth labels in ground-truth file")
+    report_col = _find_column(
+        reports_df,
+        _report_column_candidates(report_type),
+        purpose=f"{report_type} report text in reports file",
+    )
+    gt_col = _find_column(
+        gt_df,
+        _gt_column_candidates(report_type),
+        purpose=f"{report_type} ground-truth labels in ground-truth file",
+    )
 
     print("\nResolved training columns")
     print(f"  Reports file:      {reports_path}")
@@ -557,17 +399,18 @@ def load_examples(
 
     gt_by_case: Dict[str, Any] = {}
     for _, row in gt_df.iterrows():
-        case_key = normalize_case_id(row.get(gt_case_col))
-        if case_key:
-            gt_by_case[case_key] = row.get(gt_col)
+        case_id = normalize_case_id(row.get(gt_case_col))
+        if case_id:
+            gt_by_case[case_id] = row.get(gt_col)
 
     _GOLD_BY_REPORT_KEY.clear()
     _RAW_GOLD_BY_REPORT_KEY.clear()
     _CASE_ID_BY_REPORT_KEY.clear()
 
-    examples: List[dspy.Example] = []
+    examples: List[Any] = []
     missing_gt = 0
     missing_report = 0
+    duplicate_conflicts: List[str] = []
 
     for _, row in reports_df.iterrows():
         case_id = normalize_case_id(row.get(reports_case_col))
@@ -582,49 +425,294 @@ def load_examples(
             continue
 
         raw_gold = gt_by_case[case_id]
-        normalized_gold = ", ".join(sorted(normalize_gt(raw_gold)))
+        labels = sorted(normalize_gt(raw_gold), key=lambda label: cfg.LABEL_ORDER.index(label))
+        normalized_gold = ", ".join(labels)
         key = _report_key(report_text)
+        existing = _GOLD_BY_REPORT_KEY.get(key)
+        if existing is not None and existing != normalized_gold:
+            duplicate_conflicts.append(case_id)
+            continue
+
         _GOLD_BY_REPORT_KEY[key] = normalized_gold
         _RAW_GOLD_BY_REPORT_KEY[key] = raw_gold
         _CASE_ID_BY_REPORT_KEY[key] = case_id
 
-        # Critical: the DSPy Example contains only the model input.
-        # It does NOT contain labels, reasoning, or case_id.
-        examples.append(dspy.Example(report_text=report_text).with_inputs("report_text"))
+        # Labels are supervised outputs, not task inputs.  MIPRO/GEPA can learn
+        # from training labels, while normal predictions still receive only
+        # report_text.
+        example = dspy.Example(report_text=report_text, labels=normalized_gold).with_inputs("report_text")
+        examples.append(example)
 
-    if max_cases:
-        examples = examples[:max_cases]
+    if max_cases is not None:
+        examples = examples[: max(0, int(max_cases))]
 
     print(f"Loaded {len(examples)} {report_type} examples")
     print(f"Skipped rows missing report text: {missing_report}")
     print(f"Skipped rows missing ground truth: {missing_gt}")
+    if duplicate_conflicts:
+        print(f"Skipped duplicate report texts with conflicting labels: {len(duplicate_conflicts)}")
     if not examples:
-        raise ValueError("No training examples were loaded. Check shared case IDs and column names.")
+        raise ValueError("No training examples were loaded. Check paths, case IDs, and column names.")
     return examples
 
 
 # =============================================================================
-# Splitting examples
+# Multilabel-stratified splitting
 # =============================================================================
 
 
-def split_examples(examples: List[dspy.Example], seed: int = 42):
+def _target_split_sizes(total: int, ratios: Mapping[str, float]) -> Dict[str, int]:
+    names = list(ratios)
+    raw = {name: total * float(ratios[name]) for name in names}
+    sizes = {name: int(math.floor(raw[name])) for name in names}
+
+    if total >= len(names):
+        for name in names:
+            if sizes[name] == 0:
+                sizes[name] = 1
+
+    while sum(sizes.values()) > total:
+        donors = [name for name in names if sizes[name] > 1]
+        if not donors:
+            break
+        donor = max(donors, key=lambda name: sizes[name] - raw[name])
+        sizes[donor] -= 1
+
+    remaining = total - sum(sizes.values())
+    for name in sorted(names, key=lambda item: raw[item] - math.floor(raw[item]), reverse=True):
+        if remaining <= 0:
+            break
+        sizes[name] += 1
+        remaining -= 1
+
+    index = 0
+    while remaining > 0:
+        sizes[names[index % len(names)]] += 1
+        index += 1
+        remaining -= 1
+    return sizes
+
+
+def _stratification_features(example: Any) -> Set[str]:
+    labels = _gold_labels_for_example(example)
+    set_token = "SET=" + "+".join(sorted(labels))
+    return set(labels) | {set_token}
+
+
+def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
+    """Greedily preserve labels and multilabel combinations across four splits."""
     examples = list(examples)
-    random.Random(seed).shuffle(examples)
-    n = len(examples)
-    if n < 3:
-        raise ValueError(f"Only {n} examples were loaded. Use more cases so train/dev/test sets are not empty.")
-    train_end = max(1, int(n * 0.70))
-    dev_end = max(train_end + 1, int(n * 0.85)) if n >= 4 else train_end + 1
-    dev_end = min(dev_end, n)
-    trainset = examples[:train_end]
-    devset = examples[train_end:dev_end] or examples[:train_end]
-    testset = examples[dev_end:] or devset
-    return trainset, devset, testset
+    ratios = {name: float(value) for name, value in cfg.TRAIN_SPLIT_RATIOS.items()}
+    if len(examples) < len(ratios):
+        raise ValueError(
+            f"Only {len(examples)} examples were loaded; at least {len(ratios)} are needed "
+            "for train/optimizer_val/dev/test."
+        )
+
+    targets = _target_split_sizes(len(examples), ratios)
+    feature_counts: Counter[str] = Counter()
+    records: List[Tuple[Any, Set[str], float]] = []
+    rng = random.Random(seed)
+    for example in examples:
+        features = _stratification_features(example)
+        feature_counts.update(features)
+        records.append((example, features, rng.random()))
+
+    # Rare labels and rare exact label sets are placed first.
+    records.sort(
+        key=lambda item: (
+            min(feature_counts[feature] for feature in item[1]),
+            -len(item[1]),
+            item[2],
+        )
+    )
+
+    desired_feature_counts: Dict[str, Dict[str, float]] = {
+        split: {feature: feature_counts[feature] * ratios[split] for feature in feature_counts}
+        for split in ratios
+    }
+    current_feature_counts: Dict[str, Counter[str]] = {split: Counter() for split in ratios}
+    result: Dict[str, List[Any]] = {split: [] for split in ratios}
+
+    for example, features, _ in records:
+        candidates = [split for split in ratios if len(result[split]) < targets[split]]
+        if not candidates:
+            candidates = list(ratios)
+
+        def placement_score(split: str) -> Tuple[float, float, float]:
+            feature_need = 0.0
+            for feature in features:
+                desired = desired_feature_counts[split][feature]
+                current = current_feature_counts[split][feature]
+                rarity = 1.0 / max(1, feature_counts[feature])
+                feature_need += max(0.0, desired - current) * (1.0 + rarity)
+            size_need = (targets[split] - len(result[split])) / max(1, targets[split])
+            return feature_need, size_need, rng.random()
+
+        chosen = max(candidates, key=placement_score)
+        result[chosen].append(example)
+        current_feature_counts[chosen].update(features)
+
+    for split, items in result.items():
+        random.Random(seed + list(ratios).index(split) + 1).shuffle(items)
+        if not items:
+            raise ValueError(f"Stratification produced an empty {split} split.")
+    return result
 
 
 # =============================================================================
-# Evaluation and debugging
+# Optimizer creation
+# =============================================================================
+
+
+def disable_training_caches() -> None:
+    configure_cache = getattr(dspy, "configure_cache", None)
+    if callable(configure_cache):
+        try:
+            configure_cache(enable_memory_cache=False, enable_disk_cache=False)
+        except Exception:
+            pass
+    try:
+        dspy.settings.configure(cache=False)
+    except Exception:
+        pass
+
+
+def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> Any:
+    kwargs: Dict[str, Any] = {
+        "api_base": api_base,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "think": False,
+    }
+    if cfg.DSPY_DISABLE_CACHE:
+        kwargs["cache"] = False
+    try:
+        return dspy.LM(model, **kwargs)
+    except TypeError:
+        kwargs.pop("cache", None)
+        try:
+            return dspy.LM(model, **kwargs)
+        except TypeError:
+            kwargs.pop("think", None)
+            return dspy.LM(model, **kwargs)
+
+
+def prompt_or_reflection_model() -> Any:
+    model = cfg.DSPY_PROMPT_MODEL or cfg.DSPY_MODEL
+    return _make_lm(
+        model=model,
+        api_base=cfg.DSPY_PROMPT_MODEL_API_BASE,
+        temperature=float(cfg.DSPY_PROMPT_TEMPERATURE),
+        max_tokens=int(cfg.DSPY_PROMPT_MAX_TOKENS),
+    )
+
+
+def _filter_supported_kwargs(callable_obj: Callable[..., Any], kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        signature = inspect.signature(callable_obj)
+    except (TypeError, ValueError):
+        return kwargs
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values()):
+        return kwargs
+    return {key: value for key, value in kwargs.items() if key in signature.parameters}
+
+
+def _mipro_class() -> Any:
+    optimizer_class = getattr(dspy, "MIPROv2", None)
+    if optimizer_class is not None:
+        return optimizer_class
+    try:
+        from dspy.teleprompt import MIPROv2
+
+        return MIPROv2
+    except ImportError as exc:
+        raise ImportError('MIPROv2 requires DSPy with Optuna support: pip install "dspy[optuna]"') from exc
+
+
+def _gepa_class() -> Any:
+    optimizer_class = getattr(dspy, "GEPA", None)
+    if optimizer_class is not None:
+        return optimizer_class
+    try:
+        from dspy.teleprompt import GEPA
+
+        return GEPA
+    except ImportError as exc:
+        raise ImportError("GEPA is unavailable. Upgrade DSPy and install the GEPA dependency, or set DSPY_OPTIMIZER='mipro'.") from exc
+
+
+def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
+    optimizer_name = str(cfg.DSPY_OPTIMIZER).lower().strip()
+    prompt_model = prompt_or_reflection_model()
+
+    if optimizer_name in {"mipro", "miprov2"}:
+        optimizer_class = _mipro_class()
+        kwargs: Dict[str, Any] = {
+            "metric": optimizer_metric,
+            "prompt_model": prompt_model,
+            "auto": cfg.DSPY_MIPRO_AUTO,
+            "max_bootstrapped_demos": int(cfg.DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS),
+            "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
+            "seed": int(cfg.DSPY_MIPRO_SEED),
+            "init_temperature": float(cfg.DSPY_MIPRO_INIT_TEMPERATURE),
+            "verbose": bool(cfg.DSPY_MIPRO_VERBOSE),
+            "track_stats": True,
+            "metric_threshold": float(cfg.DSPY_MIPRO_METRIC_THRESHOLD),
+        }
+        if run_dir is not None:
+            kwargs["log_dir"] = str(run_dir / "optimizer_logs")
+        kwargs = _filter_supported_kwargs(optimizer_class, kwargs)
+        return "mipro", optimizer_class(**kwargs)
+
+    optimizer_class = _gepa_class()
+    kwargs = {
+        "metric": gepa_feedback_metric,
+        "auto": cfg.DSPY_GEPA_AUTO,
+        "reflection_lm": prompt_model,
+        "reflection_minibatch_size": int(cfg.DSPY_GEPA_REFLECTION_MINIBATCH_SIZE),
+        "candidate_selection_strategy": cfg.DSPY_GEPA_CANDIDATE_SELECTION,
+        "add_format_failure_as_feedback": bool(cfg.DSPY_GEPA_ADD_FORMAT_FAILURE_AS_FEEDBACK),
+        "use_merge": bool(cfg.DSPY_GEPA_USE_MERGE),
+        "track_stats": True,
+        "seed": int(cfg.DSPY_GEPA_SEED),
+    }
+    if run_dir is not None:
+        kwargs["log_dir"] = str(run_dir / "optimizer_logs")
+    kwargs = _filter_supported_kwargs(optimizer_class, kwargs)
+    return "gepa", optimizer_class(**kwargs)
+
+
+def compile_program(
+    optimizer_name: str,
+    optimizer: Any,
+    program: Any,
+    trainset: List[Any],
+    optimizer_valset: List[Any],
+) -> Any:
+    compile_kwargs: Dict[str, Any] = {
+        "trainset": trainset,
+        "valset": optimizer_valset,
+    }
+    if optimizer_name == "mipro":
+        compile_kwargs.update({
+            "max_bootstrapped_demos": int(cfg.DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS),
+            "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
+            "seed": int(cfg.DSPY_MIPRO_SEED),
+            "minibatch_size": min(int(cfg.DSPY_MIPRO_MINIBATCH_SIZE), len(optimizer_valset)),
+            "minibatch_full_eval_steps": int(cfg.DSPY_MIPRO_MINIBATCH_FULL_EVAL_STEPS),
+            "program_aware_proposer": bool(cfg.DSPY_MIPRO_PROGRAM_AWARE_PROPOSER),
+            "data_aware_proposer": bool(cfg.DSPY_MIPRO_DATA_AWARE_PROPOSER),
+            "tip_aware_proposer": bool(cfg.DSPY_MIPRO_TIP_AWARE_PROPOSER),
+            "fewshot_aware_proposer": bool(cfg.DSPY_MIPRO_FEWSHOT_AWARE_PROPOSER),
+            "view_data_batch_size": min(int(cfg.DSPY_MIPRO_VIEW_DATA_BATCH_SIZE), len(trainset)),
+        })
+    compile_kwargs = _filter_supported_kwargs(optimizer.compile, compile_kwargs)
+    return optimizer.compile(program.deepcopy(), **compile_kwargs)
+
+
+# =============================================================================
+# Evaluation
 # =============================================================================
 
 
@@ -632,23 +720,27 @@ def split_examples(examples: List[dspy.Example], seed: int = 42):
 class EvalResult:
     name: str
     accuracy: float
-    score: float
+    label_f1: float
+    search_score: float
+    promotion_score: float
     correct: int
     total: int
     wrong: int
     errors: int
     rows: List[Dict[str, Any]]
 
+    @property
+    def score(self) -> float:
+        """Backward-compatible alias for the optimizer/search score."""
+        return self.search_score
 
-def prediction_debug_row(*, example: dspy.Example, pred: Any | None = None, error: Exception | None = None) -> Dict[str, Any]:
+
+def prediction_debug_row(example: Any, pred: Any = None, error: Optional[Exception] = None) -> Dict[str, Any]:
     gold = _gold_labels_for_example(example)
-    report_text = _report_text_for_example(example)
     row: Dict[str, Any] = {
         "case_id": _case_id_for_example(example),
-        "gold_raw_for_metric_only": str(_raw_gold_for_example(example)),
-        "gold_for_metric_only": sorted(gold),
-        "gold_labels_stored_in_dspy_example": bool(_example_value(example, "labels", None) is not None),
-        "report_text_preview": report_text[:1000],
+        "gold": sorted(gold),
+        "report_text_preview": _report_text_for_example(example)[:1000],
     }
     if error is not None:
         row.update({
@@ -656,89 +748,127 @@ def prediction_debug_row(*, example: dspy.Example, pred: Any | None = None, erro
             "match": False,
             "error_type": type(error).__name__,
             "error": str(error)[:5000],
+            "exact_score": 0.0,
+            "label_f1": 0.0,
+            "search_score": 0.0,
+            "promotion_score": 0.0,
         })
         return row
 
-    raw_labels = _prediction_value(pred, "labels", "NONE")
-    raw_reasoning = _prediction_value(pred, "reasoning", "")
+    raw_labels = _value(pred, "labels", "")
     predicted = normalize_pred(raw_labels)
-    label_format_ok = raw_label_format_ok(raw_labels)
+    parts = metric_parts(example, pred)
     row.update({
         "status": "ok",
-        "match": label_format_ok and gold == predicted,
+        "match": parts.exact == 1.0,
         "predicted": sorted(predicted),
-        "label_format_ok": label_format_ok,
+        "label_format_ok": parts.format_ok,
         "raw_labels": str(raw_labels),
-        "raw_reasoning": str(raw_reasoning),
+        "raw_reasoning": str(_value(pred, "reasoning", "")),
+        "exact_score": parts.exact,
+        "label_f1": parts.f1,
+        "search_score": parts.search,
+        "promotion_score": parts.promotion,
         "raw_prediction_repr": repr(pred)[:3000],
     })
     return row
 
 
+def capture_dspy_history(count: int) -> str:
+    buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            dspy.inspect_history(n=count)
+        return buffer.getvalue()
+    except Exception as exc:
+        return f"Could not inspect DSPy history: {exc}\n"
+
+
+def append_history(path: Path, heading: str, count: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n" + "=" * 100 + "\n")
+        handle.write(heading + "\n")
+        handle.write("=" * 100 + "\n")
+        handle.write(capture_dspy_history(count))
+
+
 def evaluate_split(
-    program,
-    examples: List[dspy.Example],
+    program: Any,
+    examples: List[Any],
     name: str,
     history_on_error_path: Optional[Path] = None,
-    history_size: int = 3,
 ) -> EvalResult:
     rows: List[Dict[str, Any]] = []
-    correct = 0
-    error_count = 0
-    score_total = 0.0
-    for ex in examples:
+    totals = defaultdict(float)
+    errors = 0
+
+    for example in examples:
         try:
-            pred = program(report_text=_report_text_for_example(ex))
-            row = prediction_debug_row(example=ex, pred=pred)
-            try:
-                optimizer_score = float(optimizer_metric(ex, pred))
-            except Exception as metric_exc:
-                optimizer_score = 0.0
-                row["metric_error"] = f"{type(metric_exc).__name__}: {metric_exc}"
-            row["optimizer_score"] = optimizer_score
-            score_total += optimizer_score
+            pred = program(report_text=_report_text_for_example(example))
+            row = prediction_debug_row(example, pred=pred)
         except Exception as exc:
-            row = prediction_debug_row(example=ex, error=exc)
-            row["optimizer_score"] = 0.0
-            error_count += 1
-            if history_on_error_path and bool(getattr(cfg, "DSPY_SAVE_HISTORY_ON_ERROR", True)):
-                append_dspy_history_on_error(history_on_error_path, case_id=row.get("case_id", ""), error=exc, n=history_size)
+            row = prediction_debug_row(example, error=exc)
+            errors += 1
+            if history_on_error_path is not None and cfg.DSPY_SAVE_HISTORY_ON_ERROR:
+                append_history(
+                    history_on_error_path,
+                    f"case {_case_id_for_example(example)} error: {type(exc).__name__}: {exc}",
+                    int(cfg.DSPY_ERROR_HISTORY_SIZE),
+                )
         rows.append(row)
-        if row["match"]:
-            correct += 1
+        totals["exact"] += float(row["exact_score"])
+        totals["f1"] += float(row["label_f1"])
+        totals["search"] += float(row["search_score"])
+        totals["promotion"] += float(row["promotion_score"])
+
     total = len(examples)
-    acc = correct / total if total else 0.0
-    score = score_total / total if total else 0.0
-    wrong = total - correct - error_count
-    print(
-        f"{name}: {correct}/{total} = {acc:.2%}; "
-        f"optimizer score = {score:.4f} ({wrong} wrong, {error_count} parse/runtime errors)"
+    divisor = total or 1
+    correct = int(totals["exact"])
+    wrong = total - correct - errors
+    result = EvalResult(
+        name=name,
+        accuracy=totals["exact"] / divisor,
+        label_f1=totals["f1"] / divisor,
+        search_score=totals["search"] / divisor,
+        promotion_score=totals["promotion"] / divisor,
+        correct=correct,
+        total=total,
+        wrong=wrong,
+        errors=errors,
+        rows=rows,
     )
-    return EvalResult(name=name, accuracy=acc, score=score, correct=correct, total=total, wrong=wrong, errors=error_count, rows=rows)
+    print(
+        f"{name}: exact={result.accuracy:.2%}, label_f1={result.label_f1:.4f}, "
+        f"search={result.search_score:.4f}, promotion={result.promotion_score:.4f} "
+        f"({correct}/{total}, {wrong} wrong, {errors} errors)"
+    )
+    return result
+
 
 def evaluate_splits(
-    program,
-    splits: Dict[str, List[dspy.Example]],
+    program: Any,
+    splits: Mapping[str, List[Any]],
     prefix: str,
     history_on_error_path: Optional[Path] = None,
-    history_size: int = 3,
 ) -> Dict[str, EvalResult]:
-    results: Dict[str, EvalResult] = {}
-    for split_name, examples in splits.items():
-        results[split_name] = evaluate_split(
+    return {
+        split: evaluate_split(
             program,
             examples,
-            f"{prefix} {split_name}",
+            f"{prefix} {split}",
             history_on_error_path=history_on_error_path,
-            history_size=history_size,
         )
-    return results
+        for split, examples in splits.items()
+    }
 
 
 def summarize_eval(result: EvalResult) -> Dict[str, Any]:
     return {
         "accuracy": result.accuracy,
-        "score": result.score,
+        "label_f1": result.label_f1,
+        "search_score": result.search_score,
+        "promotion_score": result.promotion_score,
         "correct": result.correct,
         "total": result.total,
         "wrong": result.wrong,
@@ -746,74 +876,82 @@ def summarize_eval(result: EvalResult) -> Dict[str, Any]:
     }
 
 
+def decide_promotion(
+    baseline: EvalResult,
+    candidate: EvalResult,
+    *,
+    split_name: str,
+    quality_ok: bool,
+    quality_reason: str,
+) -> Tuple[bool, str, float, bool]:
+    """Return whether the candidate should replace the saved best program."""
+    delta = candidate.promotion_score - baseline.promotion_score
+    exact_non_regression = candidate.accuracy + 1e-12 >= baseline.accuracy
+
+    if not quality_ok:
+        return False, f"rejected by prompt guard: {quality_reason}", delta, exact_non_regression
+    if cfg.DSPY_REQUIRE_EXACT_NON_REGRESSION and not exact_non_regression:
+        return (
+            False,
+            f"rejected because exact accuracy regressed on {split_name}: "
+            f"{candidate.accuracy:.4f} < {baseline.accuracy:.4f}",
+            delta,
+            exact_non_regression,
+        )
+    if delta > float(cfg.DSPY_MIN_PROMOTION_IMPROVEMENT):
+        return (
+            True,
+            f"promotion score improved on {split_name}: "
+            f"{candidate.promotion_score:.4f} > {baseline.promotion_score:.4f} "
+            f"(delta={delta:.4f}); exact {baseline.accuracy:.4f} -> {candidate.accuracy:.4f}",
+            delta,
+            exact_non_regression,
+        )
+    return (
+        False,
+        f"promotion score did not improve enough on {split_name}: "
+        f"delta={delta:.4f}, required>{cfg.DSPY_MIN_PROMOTION_IMPROVEMENT}",
+        delta,
+        exact_non_regression,
+    )
+
+
 # =============================================================================
-# Logging helpers
+# Prompt/program and logging helpers
 # =============================================================================
 
 
-def make_optimization_run_dir(report_type: str, iteration: int) -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = Path("Files") / "Results" / "DSPy_Optimization_Runs" / report_type.upper() / f"{timestamp}_iter_{iteration:04d}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir
+def _signature_instructions(report_type: str) -> str:
+    return {
+        "CT": cfg.CT_SIGNATURE_INSTRUCTIONS,
+        "CTA": cfg.CTA_SIGNATURE_INSTRUCTIONS,
+        "CTP": cfg.CTP_SIGNATURE_INSTRUCTIONS,
+    }[report_type]
 
 
-def make_run_layout(run_dir: Path) -> Dict[str, Path]:
-    layout = {"root": run_dir, "debug": run_dir / "debug", "prompts": run_dir / "prompts"}
-    for path in layout.values():
-        path.mkdir(parents=True, exist_ok=True)
-    return layout
+def _fixed_rules(report_type: str) -> str:
+    return cfg.CTA_FIXED_RULES if report_type == "CTA" else ""
 
 
-def capture_dspy_history(n: int = 30) -> str:
-    buffer = io.StringIO()
-    try:
-        with contextlib.redirect_stdout(buffer):
-            dspy.inspect_history(n=n)
-        return buffer.getvalue()
-    except Exception as exc:
-        return f"Could not inspect DSPy history: {exc}\n"
+def effective_prompt_text(report_type: str, signature_instructions: str) -> str:
+    fixed = _fixed_rules(report_type)
+    if not fixed:
+        return signature_instructions.strip()
+    return (
+        f"{signature_instructions.strip()}\n\n"
+        "Fixed CTA output constraints supplied as the `cta_rules` input:\n"
+        f"{fixed.strip()}"
+    )
 
 
-def append_dspy_history_file(path: Path, heading: str, n: int = 30) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write("\n" + "=" * 100 + "\n")
-        f.write(heading + "\n")
-        f.write("=" * 100 + "\n")
-        f.write(capture_dspy_history(n=n))
-        f.write("\n")
-
-
-def append_dspy_history_on_error(path: Path, *, case_id: str, error: Exception, n: int = 3) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write("\n" + "=" * 100 + "\n")
-        f.write(f"Case ID: {case_id}\n")
-        f.write(f"Error type: {type(error).__name__}\n")
-        f.write(f"Error: {str(error)[:5000]}\n")
-        f.write("\n--- dspy.inspect_history() ---\n")
-        f.write(capture_dspy_history(n=n))
-        f.write("\n")
-
-
-def save_program(program, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        program.save(str(path))
-    except Exception as exc:
-        path.with_suffix(".error.txt").write_text(str(exc), encoding="utf-8")
-
-
-def load_program_if_present(program, path: Path) -> Tuple[bool, str]:
-    """Load an existing optimized DSPy program into `program` when possible."""
-    if not path.exists():
-        return False, f"no saved program found at {path}"
-    try:
-        program.load(str(path))
-        return True, f"warm-started from saved optimized program: {path}"
-    except Exception as exc:
-        return False, f"could not warm-start from {path}: {type(exc).__name__}: {exc}"
+def _program_for_report_type(report_type: str) -> Tuple[Any, str]:
+    if report_type == "CT":
+        return CTLabeler(), f"{cfg.DSPY_PROGRAM_NAMES['CT']}.json"
+    if report_type == "CTA":
+        return CTALabeler(), f"{cfg.DSPY_PROGRAM_NAMES['CTA']}.json"
+    if report_type == "CTP":
+        return CTPLabeler(), f"{cfg.DSPY_PROGRAM_NAMES['CTP']}.json"
+    raise ValueError("report_type must be CT, CTA, or CTP")
 
 
 def extract_program_instructions(program: Any) -> str:
@@ -835,475 +973,450 @@ def extract_program_instructions(program: Any) -> str:
     return ""
 
 
-def _normalized_prompt_text(text: str) -> str:
-    text = str(text or "").lower()
-    for ch in ('"', "'", "`", "“", "”", "‘", "’"):
-        text = text.replace(ch, "")
-    return " ".join(text.split())
+def load_program_if_present(program: Any, path: Path) -> Tuple[bool, str]:
+    if not path.exists():
+        return False, f"no saved program found at {path}"
+    try:
+        program.load(str(path))
+        return True, f"warm-started from saved best program: {path}"
+    except Exception as exc:
+        return False, f"could not warm-start from {path}: {type(exc).__name__}: {exc}"
 
 
-def prompt_quality_ok(prompt: str, report_type: str = "") -> Tuple[bool, str]:
-    """Reject obviously degraded effective prompts before saving them."""
-    prompt = str(prompt or "").strip()
-    min_chars = int(getattr(cfg, "DSPY_PROMPT_MIN_CHARS", 500))
-    if len(prompt) < min_chars:
-        return False, f"prompt too short ({len(prompt)} chars < {min_chars})"
+def save_program(program: Any, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    program.save(str(path))
 
-    report_type = (report_type or "").upper().strip()
+
+def _normalized_prompt(text: str) -> str:
+    normalized = str(text or "").lower()
+    normalized = normalized.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+    return " ".join(normalized.split())
+
+
+def prompt_quality_ok(signature_prompt: str, report_type: str) -> Tuple[bool, str]:
+    """Validate only DSPy's generated signature instruction, not fixed rules."""
+    prompt = str(signature_prompt or "").strip()
+    if len(prompt) < int(cfg.DSPY_PROMPT_MIN_CHARS):
+        return False, f"signature prompt too short ({len(prompt)} < {cfg.DSPY_PROMPT_MIN_CHARS})"
+    if len(prompt) > int(cfg.DSPY_PROMPT_MAX_CHARS):
+        return False, f"signature prompt too long ({len(prompt)} > {cfg.DSPY_PROMPT_MAX_CHARS})"
+
+    normalized = " " + _normalized_prompt(prompt) + " "
+    for forbidden in cfg.DSPY_PROMPT_FORBIDDEN_TERMS:
+        if _normalized_prompt(forbidden) in normalized:
+            return False, f"signature prompt contains forbidden wording: {forbidden!r}"
+
     if report_type == "CTA":
-        required_terms = list(getattr(cfg, "DSPY_CTA_REQUIRED_PROMPT_TERMS", []))
-    else:
-        required_terms = ["Allowed labels", "NONE", "RMCA", "LMCA"]
-
-    normalized = _normalized_prompt_text(prompt)
-    missing = [term for term in required_terms if _normalized_prompt_text(term) not in normalized]
-    if missing:
-        return False, "prompt missing required safety terms: " + ", ".join(missing)
+        missing_groups: List[Tuple[str, ...]] = []
+        for group in cfg.DSPY_CTA_REQUIRED_TERM_GROUPS:
+            if not any(_normalized_prompt(term) in normalized for term in group):
+                missing_groups.append(tuple(group))
+        if missing_groups:
+            readable = ["/".join(group) for group in missing_groups]
+            return False, "signature prompt is missing required policy concepts: " + ", ".join(readable)
     return True, "ok"
 
 
-def save_examples_debug(path: Path, *, trainset, devset, testset) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    rows: List[Dict[str, Any]] = []
-    for split_name, examples in (("train", trainset), ("dev", devset), ("test", testset)):
-        for ex in examples:
-            rows.append({
-                "split": split_name,
-                "case_id": _case_id_for_example(ex),
-                "gold_labels_for_metric_only": sorted(_gold_labels_for_example(ex)),
-                "gold_labels_stored_in_dspy_example": bool(_example_value(ex, "labels", None) is not None),
-                "report_text_preview": _report_text_for_example(ex)[:500],
+def make_run_dir(report_type: str, iteration: int, suffix: str = "") -> Path:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = f"{stamp}_iter_{iteration:04d}{suffix}"
+    path = Path(cfg.TRAIN_RUNS_ROOT) / report_type / name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def make_layout(run_dir: Path) -> Dict[str, Path]:
+    layout = {
+        "root": run_dir,
+        "debug": run_dir / "debug",
+        "prompts": run_dir / "prompts",
+    }
+    for path in layout.values():
+        path.mkdir(parents=True, exist_ok=True)
+    return layout
+
+
+def save_split_debug(
+    path: Path,
+    splits: Mapping[str, List[Any]],
+    *,
+    redact_splits: Set[str] | None = None,
+) -> None:
+    redacted = set(redact_splits or set())
+    output: Dict[str, Any] = {"sizes": {}, "label_counts": {}, "examples": []}
+    for split, examples in splits.items():
+        output["sizes"][split] = len(examples)
+        counts: Counter[str] = Counter()
+        for example in examples:
+            labels = sorted(_gold_labels_for_example(example))
+            if split not in redacted:
+                counts.update(labels)
+            output["examples"].append({
+                "split": split,
+                "case_id": _case_id_for_example(example),
+                "labels": labels if split not in redacted else "<redacted until final audit>",
+                "report_text_preview": _report_text_for_example(example)[:500],
             })
-    path.write_text(json.dumps(rows, indent=2, default=str), encoding="utf-8")
+        output["label_counts"][split] = (
+            dict(sorted(counts.items())) if split not in redacted else "<redacted until final audit>"
+        )
+    path.write_text(json.dumps(output, indent=2), encoding="utf-8")
 
 
-def save_predictions_debug(path: Path, results_by_stage: Dict[str, Dict[str, EvalResult]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def save_predictions(path: Path, stages: Mapping[str, Mapping[str, EvalResult]]) -> None:
     output: Dict[str, Any] = {}
-    for stage, split_results in results_by_stage.items():
-        output[stage] = {}
-        for split_name, result in split_results.items():
-            output[stage][split_name] = {
-                "summary": summarize_eval(result),
-                "rows": result.rows,
-            }
+    for stage, split_results in stages.items():
+        output[stage] = {
+            split: {"summary": summarize_eval(result), "rows": result.rows}
+            for split, result in split_results.items()
+        }
     path.write_text(json.dumps(output, indent=2, default=str), encoding="utf-8")
 
 
-def save_accuracy_report(path: Path, summary: Dict[str, Any]) -> None:
-    def pct(value: Any) -> str:
-        return "N/A" if value is None else f"{float(value):.2%}"
-
-    def line_for(stage: str, split: str) -> str:
-        item = summary.get("accuracies", {}).get(stage, {}).get(split)
-        if not item:
-            return f"{stage} {split}: N/A"
-        score = item.get("score")
-        score_text = "N/A" if score is None else f"{float(score):.4f}"
-        return f"{stage} {split}: {pct(item['accuracy'])} ({item['correct']}/{item['total']}), score={score_text}"
-
+def save_summary_text(path: Path, summary: Mapping[str, Any]) -> None:
     lines = [
+        f"Created: {summary.get('created_at')}",
+        f"Iteration: {summary.get('iteration')}",
         f"Report type: {summary.get('report_type')}",
-        f"Created at: {summary.get('created_at')}",
-        f"Run folder: {summary.get('timestamped_run_dir')}",
-        "",
-        "Accuracy by split:",
-        line_for("baseline", "train"),
-        line_for("baseline", "dev"),
-        line_for("baseline", "test"),
-        line_for("candidate", "train"),
-        line_for("candidate", "dev"),
-        line_for("candidate", "test"),
-        line_for("active_after", "train"),
-        line_for("active_after", "dev"),
-        line_for("active_after", "test"),
-        "",
-        f"Candidate accepted as after prompt: {summary.get('candidate_accepted')}",
+        f"Optimizer: {summary.get('optimizer')}",
+        f"Candidate accepted: {summary.get('candidate_accepted')}",
         f"Acceptance reason: {summary.get('acceptance_reason')}",
-        f"Prompt quality check: {summary.get('prompt_quality_reason')}",
         f"Saved program status: {summary.get('saved_program_status')}",
-        f"Optimizer metric: {summary.get('optimizer_metric')}",
-        f"Acceptance split: {summary.get('acceptance_split')}",
-        f"Baseline accept score: {summary.get('baseline_accept_score')}",
-        f"Candidate accept score: {summary.get('candidate_accept_score')}",
-        f"Acceptance score delta: {summary.get('acceptance_score_delta')}",
-        f"Minimum required score improvement: {summary.get('min_score_improvement')}",
-        f"Candidate signature prompt chars: {summary.get('candidate_signature_prompt_chars')}",
-        f"Candidate effective prompt chars: {summary.get('candidate_effective_prompt_chars')}",
-        f"Fixed rules chars: {summary.get('fixed_rules_chars')}",
-        "",
-        f"Gold labels hidden from DSPy examples: {summary.get('gold_labels_hidden_from_dspy_examples')}",
-        f"Warm-start enabled: {summary.get('warm_start_enabled')}",
-        f"Warm-started this iteration: {summary.get('warm_started')}",
-        f"Warm-start status: {summary.get('warm_start_status')}",
-        f"Instruction-only optimization: {summary.get('instruction_only_optimization')}",
-        f"MIPRO optimizer valset source: {summary.get('mipro_valset_source')}",
-        f"MIPRO optimizer valset size: {summary.get('mipro_valset_size')}",
-        f"Max bootstrapped demos: {summary.get('max_bootstrapped_demos')}",
-        f"Max labeled demos: {summary.get('max_labeled_demos')}",
     ]
+    for stage in ("baseline", "candidate", "active_after"):
+        for split, values in summary.get("metrics", {}).get(stage, {}).items():
+            lines.append(
+                f"{stage} {split}: exact={values['accuracy']:.4f}, f1={values['label_f1']:.4f}, "
+                f"search={values['search_score']:.4f}, promotion={values['promotion_score']:.4f}"
+            )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 # =============================================================================
-# Training one modality
+# One optimization iteration
 # =============================================================================
 
 
-def _program_for_report_type(report_type: str):
-    report_type = report_type.upper()
-    program_names = getattr(cfg, "DSPY_PROGRAM_NAMES", {})
-    if report_type == "CT":
-        return CTLabeler(), f"{program_names.get('CT', 'ct_labeler')}.json"
-    if report_type == "CTA":
-        return CTALabeler(), f"{program_names.get('CTA', 'cta_labeler_fixed_rules')}.json"
-    if report_type == "CTP":
-        return CTPLabeler(), f"{program_names.get('CTP', 'ctp_labeler')}.json"
-    raise ValueError("report_type must be CT, CTA, or CTP")
-
-
-def train_one(
-    report_type: str,
-    reports_file: str,
-    ground_truth_file: str,
-    max_cases: Optional[int] = None,
-    iteration: int = 1,
-    save_run_logs: bool = True,
-    history_size: int = 30,
-    baseline_only: bool = False,
-    smoke_test: bool = False,
-    allow_demos: bool = False,
-    mipro_valset_source: Optional[str] = None,
-    accept_equal: Optional[bool] = None,
-    save_even_if_worse: bool = False,
-    warm_start: bool = True,
-) -> Dict[str, Any]:
-    report_type = report_type.upper()
+def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
+    report_type = str(cfg.TRAIN_REPORT_TYPE).upper().strip()
     disable_training_caches()
     configure_dspy()
     disable_training_caches()
 
     run_dir: Optional[Path] = None
     layout: Optional[Dict[str, Path]] = None
-    if save_run_logs:
-        run_dir = make_optimization_run_dir(report_type, iteration)
-        layout = make_run_layout(run_dir)
+    if cfg.TRAIN_SAVE_RUN_LOGS:
+        run_dir = make_run_dir(report_type, iteration)
+        layout = make_layout(run_dir)
 
-    examples = load_examples(reports_file=reports_file, ground_truth_file=ground_truth_file, report_type=report_type, max_cases=max_cases)
-    trainset, devset, testset = split_examples(examples)
-    splits = {"train": trainset, "dev": devset, "test": testset}
+    examples = load_examples(
+        reports_file=cfg.TRAINING_REPORTS_FILE,
+        ground_truth_file=cfg.GROUND_TRUTH_FILE,
+        report_type=report_type,
+        max_cases=cfg.TRAIN_MAX_CASES,
+    )
+    splits = split_examples(examples, seed=int(cfg.TRAIN_RANDOM_SEED))
+    eval_splits = {
+        name: values
+        for name, values in splits.items()
+        if name != "test" or evaluate_test
+    }
+
     program, save_name = _program_for_report_type(report_type)
-
     active_save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
-    saved_program_existed_before = active_save_path.exists()
-    warm_started = False
-    if warm_start:
+    saved_program_existed = active_save_path.exists()
+    if cfg.TRAIN_WARM_START:
         warm_started, warm_start_status = load_program_if_present(program, active_save_path)
     else:
-        warm_start_status = "warm-start disabled; starting from config signature instructions"
+        warm_started = False
+        warm_start_status = "warm-start disabled in config.py"
 
-    before_signature_prompt = extract_program_instructions(program) or _signature_instructions(report_type)
-    before_prompt = effective_prompt_text(report_type, before_signature_prompt)
+    before_signature = extract_program_instructions(program) or _signature_instructions(report_type)
+    before_effective = effective_prompt_text(report_type, before_signature)
 
-    print(f"\nTraining {report_type}")
-    print(f"Train: {len(trainset)} | Dev: {len(devset)} | Test: {len(testset)}")
+    print(f"\nTraining {report_type}; iteration {iteration}")
+    print(" | ".join(f"{name}: {len(values)}" for name, values in splits.items()))
     print(warm_start_status)
 
-    if layout:
-        (layout["prompts"] / "before_signature_prompt.txt").write_text(before_signature_prompt, encoding="utf-8")
-        (layout["prompts"] / "before_prompt.txt").write_text(before_prompt, encoding="utf-8")
+    if layout is not None:
+        save_split_debug(layout["debug"] / "split_examples.json", splits, redact_splits={"test"})
+        (layout["prompts"] / "before_signature_prompt.txt").write_text(before_signature, encoding="utf-8")
+        (layout["prompts"] / "before_effective_prompt.txt").write_text(before_effective, encoding="utf-8")
         save_program(program, layout["prompts"] / "before_program.json")
-        save_examples_debug(layout["debug"] / "loaded_examples.json", trainset=trainset, devset=devset, testset=testset)
 
-    if smoke_test:
-        smoke_result = evaluate_split(program, [testset[0]], f"{report_type} smoke test")
+    if cfg.TRAIN_SMOKE_TEST:
+        smoke_split = splits["dev"]
+        smoke = evaluate_split(program, smoke_split[:1], f"{report_type} smoke")
         summary = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "iteration": iteration,
             "report_type": report_type,
             "mode": "smoke_test",
-            "smoke_test": summarize_eval(smoke_result),
-            "timestamped_run_dir": str(run_dir) if run_dir else None,
-            "gold_labels_hidden_from_dspy_examples": True,
-            "warm_start_enabled": warm_start,
-            "warm_started": warm_started,
-            "warm_start_status": warm_start_status,
-            "active_save_path": str(active_save_path),
+            "candidate_accepted": False,
+            "smoke": summarize_eval(smoke),
         }
-        if layout:
-            save_predictions_debug(layout["debug"] / "predictions.json", {"smoke_test": {"test": smoke_result}})
-            append_dspy_history_file(layout["debug"] / "dspy_history.txt", "after smoke test", n=history_size)
+        if layout is not None:
+            save_predictions(layout["debug"] / "predictions.json", {"smoke": {"dev": smoke}})
             (layout["root"] / "optimization_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         return summary
 
-    baseline_results = evaluate_splits(
-        program,
-        splits,
-        f"{report_type} baseline",
-        history_on_error_path=(layout["debug"] / "dspy_history_on_errors.txt") if layout else None,
-        history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
-    )
-    if layout:
-        append_dspy_history_file(layout["debug"] / "dspy_history.txt", "after baseline evaluation", n=history_size)
+    error_history = layout["debug"] / "history_on_errors.txt" if layout is not None else None
+    baseline_results = evaluate_splits(program, eval_splits, f"{report_type} baseline", error_history)
+    if layout is not None:
+        append_history(layout["debug"] / "dspy_history.txt", "after baseline evaluation", int(cfg.TRAIN_HISTORY_SIZE))
 
-    base_summary = {
+    if cfg.TRAIN_BASELINE_ONLY:
+        summary = {
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "iteration": iteration,
+            "report_type": report_type,
+            "mode": "baseline_only",
+            "candidate_accepted": False,
+            "acceptance_reason": "TRAIN_BASELINE_ONLY is enabled",
+            "saved_program_status": "saved program unchanged",
+            "metrics": {"baseline": {name: summarize_eval(result) for name, result in baseline_results.items()}},
+        }
+        if layout is not None:
+            save_predictions(layout["debug"] / "predictions.json", {"baseline": baseline_results})
+            (layout["root"] / "optimization_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+            save_summary_text(layout["root"] / "accuracy_report.txt", summary)
+        return summary
+
+    optimizer_name, optimizer = build_optimizer(run_dir)
+    print(
+        f"{optimizer_name.upper()} will train on {len(splits['train'])} examples and "
+        f"search on {len(splits['optimizer_val'])} optimizer-validation examples."
+    )
+    try:
+        candidate_program = compile_program(
+            optimizer_name,
+            optimizer,
+            program,
+            splits["train"],
+            splits["optimizer_val"],
+        )
+    except Exception as exc:
+        if layout is not None:
+            append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile error", int(cfg.TRAIN_HISTORY_SIZE))
+            (layout["debug"] / "compile_error.txt").write_text(f"{type(exc).__name__}: {exc}", encoding="utf-8")
+            save_predictions(layout["debug"] / "predictions.json", {"baseline": baseline_results})
+        raise RuntimeError(
+            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt and DSPy history."
+        ) from exc
+
+    if layout is not None:
+        append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile", int(cfg.TRAIN_HISTORY_SIZE))
+
+    candidate_results = evaluate_splits(candidate_program, eval_splits, f"{report_type} candidate", error_history)
+    if layout is not None:
+        append_history(layout["debug"] / "dspy_history.txt", "after candidate evaluation", int(cfg.TRAIN_HISTORY_SIZE))
+
+    candidate_signature = extract_program_instructions(candidate_program)
+    candidate_effective = effective_prompt_text(report_type, candidate_signature)
+    quality_ok, quality_reason = prompt_quality_ok(candidate_signature, report_type)
+
+    acceptance_split = str(cfg.DSPY_ACCEPTANCE_SPLIT)
+    baseline_accept = baseline_results[acceptance_split]
+    candidate_accept = candidate_results[acceptance_split]
+    accepted, acceptance_reason, promotion_delta, exact_non_regression = decide_promotion(
+        baseline_accept,
+        candidate_accept,
+        split_name=acceptance_split,
+        quality_ok=quality_ok,
+        quality_reason=quality_reason,
+    )
+
+    active_program = candidate_program if accepted else program
+    active_results = candidate_results if accepted else baseline_results
+    active_save_path.parent.mkdir(parents=True, exist_ok=True)
+    if accepted:
+        save_program(candidate_program, active_save_path)
+        saved_program_status = f"accepted candidate saved to {active_save_path}; next loop iteration will warm-start from it"
+    elif not active_save_path.exists():
+        save_program(program, active_save_path)
+        saved_program_status = f"candidate rejected; baseline saved because no prior program existed: {active_save_path}"
+    else:
+        saved_program_status = f"candidate rejected; existing best program preserved: {active_save_path}"
+
+    summary: Dict[str, Any] = {
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "iteration": iteration,
         "report_type": report_type,
-        "reports_file": str(reports_file),
-        "ground_truth_file": str(ground_truth_file),
-        "max_cases": max_cases,
-        "total_examples": len(examples),
-        "train_examples": len(trainset),
-        "dev_examples": len(devset),
-        "test_examples": len(testset),
-        "gold_labels_hidden_from_dspy_examples": True,
-        "dspy_cache_disabled": True,
-        "instruction_only_optimization": not allow_demos,
-        "max_bootstrapped_demos": 0 if not allow_demos else None,
-        "max_labeled_demos": 0 if not allow_demos else None,
-        "timestamped_run_dir": str(run_dir) if run_dir else None,
-        "warm_start_enabled": warm_start,
-        "warm_started": warm_started,
-        "warm_start_status": warm_start_status,
-        "saved_program_existed_before": saved_program_existed_before,
-        "active_save_path": str(active_save_path),
-        "before_signature_prompt_chars": len(before_signature_prompt),
-        "before_effective_prompt_chars": len(before_prompt),
-    }
-
-    if baseline_only:
-        summary = {
-            **base_summary,
-            "mode": "baseline_only",
-            "candidate_accepted": False,
-            "acceptance_reason": "baseline-only mode",
-            "prompt_quality_reason": "not run",
-            "accuracies": {"baseline": {k: summarize_eval(v) for k, v in baseline_results.items()}},
-            "active_saved_program": str(active_save_path) if active_save_path.exists() else None,
-            "saved_program_status": "baseline-only mode; saved program was not changed",
-        }
-        if layout:
-            save_predictions_debug(layout["debug"] / "predictions.json", {"baseline": baseline_results})
-            (layout["prompts"] / "after_prompt.txt").write_text(before_prompt, encoding="utf-8")
-            save_program(program, layout["prompts"] / "after_program.json")
-            (layout["root"] / "optimization_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-            save_accuracy_report(layout["root"] / "accuracy_report.txt", summary)
-        print("Baseline-only mode: skipped MIPRO optimization.")
-        return summary
-
-    optimizer_valset_source = (mipro_valset_source or getattr(cfg, "DSPY_MIPRO_VALSET_SOURCE", "train"))
-    optimizer_valset = choose_optimizer_valset(trainset, devset, testset, optimizer_valset_source)
-    print(f"MIPRO candidate prompts will be evaluated on {len(optimizer_valset)} cases from split source: {optimizer_valset_source}")
-
-    optimizer = get_optimizer(optimizer_metric, run_dir=run_dir)
-    try:
-        optimized_program = compile_with_no_answer_leak(optimizer, program, trainset, optimizer_valset, allow_demos=allow_demos)
-    except Exception as exc:
-        if layout:
-            append_dspy_history_file(layout["debug"] / "dspy_history.txt", "after compile error", n=history_size)
-            (layout["debug"] / "compile_error.txt").write_text(f"{type(exc).__name__}: {exc}", encoding="utf-8")
-            save_predictions_debug(layout["debug"] / "predictions.json", {"baseline": baseline_results})
-        raise RuntimeError(
-            "DSPy optimization failed during compile. Check debug/compile_error.txt and debug/dspy_history.txt."
-        ) from exc
-
-    if layout:
-        append_dspy_history_file(layout["debug"] / "dspy_history.txt", "after MIPRO compile", n=history_size)
-
-    candidate_results = evaluate_splits(
-        optimized_program,
-        splits,
-        f"{report_type} candidate",
-        history_on_error_path=(layout["debug"] / "dspy_history_on_errors.txt") if layout else None,
-        history_size=getattr(cfg, "DSPY_ERROR_HISTORY_SIZE", 3),
-    )
-    if layout:
-        append_dspy_history_file(layout["debug"] / "dspy_history.txt", "after candidate evaluation", n=history_size)
-
-    # `before_signature_prompt` / `before_prompt` were captured after optional warm-start.
-    candidate_signature_prompt = extract_program_instructions(optimized_program)
-    candidate_prompt = effective_prompt_text(report_type, candidate_signature_prompt)
-    quality_ok, quality_reason = prompt_quality_ok(candidate_prompt, report_type=report_type)
-
-    if accept_equal is None:
-        accept_equal = bool(getattr(cfg, "DSPY_ACCEPT_EQUAL_ACCURACY", False))
-
-    acceptance_split = str(getattr(cfg, "DSPY_ACCEPTANCE_SPLIT", "dev") or "dev").lower().strip()
-    if acceptance_split not in baseline_results:
-        raise ValueError(f"DSPY_ACCEPTANCE_SPLIT must be one of {sorted(baseline_results)}")
-
-    # Acceptance uses the same per-example reward metric given to MIPRO, averaged
-    # over the configured acceptance split. With strict_exact this is identical to
-    # strict accuracy; with label_f1 this can reward partial improvements.
-    baseline_accept_score = baseline_results[acceptance_split].score
-    candidate_accept_score = candidate_results[acceptance_split].score
-    score_delta = candidate_accept_score - baseline_accept_score
-    min_score_improvement = float(getattr(cfg, "DSPY_MIN_SCORE_IMPROVEMENT", 0.0))
-
-    force_save_note = ""
-    if save_even_if_worse:
-        force_save_note = (
-            " -- note: --save-even-if-worse no longer overwrites the active optimized program; "
-            "rejected candidates are still saved in the run folder as candidate_program.json"
-        )
-
-    if not quality_ok:
-        accepted = False
-        acceptance_reason = f"candidate rejected: {quality_reason}{force_save_note}"
-    elif score_delta > min_score_improvement:
-        accepted = True
-        acceptance_reason = (
-            f"candidate improved {acceptance_split} optimizer score "
-            f"({candidate_accept_score:.4f} > {baseline_accept_score:.4f}; "
-            f"delta={score_delta:.4f})"
-        )
-    elif accept_equal and abs(score_delta) <= 1e-12:
-        accepted = True
-        acceptance_reason = (
-            f"candidate tied {acceptance_split} optimizer score and equal scores are allowed "
-            f"({candidate_accept_score:.4f})"
-        )
-    else:
-        accepted = False
-        acceptance_reason = (
-            f"candidate not better on {acceptance_split} optimizer score "
-            f"({candidate_accept_score:.4f} <= {baseline_accept_score:.4f}; "
-            f"delta={score_delta:.4f}){force_save_note}"
-        )
-
-    active_program = optimized_program if accepted else program
-    active_results = candidate_results if accepted else baseline_results
-
-    Path(cfg.DSPY_PROGRAM_DIR).mkdir(parents=True, exist_ok=True)
-    if accepted:
-        active_program.save(str(active_save_path))
-        saved_program_status = (
-            f"accepted candidate saved to {active_save_path}; this prompt will be the next loop iteration's start"
-        )
-    elif not active_save_path.exists():
-        program.save(str(active_save_path))
-        saved_program_status = (
-            f"candidate rejected; no previous saved program existed, so baseline was saved to {active_save_path}"
-        )
-    else:
-        saved_program_status = (
-            f"candidate rejected; existing saved program left unchanged at {active_save_path}"
-        )
-
-    summary = {
-        **base_summary,
-        "mipro_valset_source": optimizer_valset_source,
-        "mipro_valset_size": len(optimizer_valset),
+        "optimizer": optimizer_name,
         "candidate_accepted": accepted,
         "acceptance_reason": acceptance_reason,
         "prompt_quality_reason": quality_reason,
         "saved_program_status": saved_program_status,
         "active_saved_program": str(active_save_path),
-        "optimizer_metric": str(getattr(cfg, "DSPY_OPTIMIZER_METRIC", "strict_exact")),
-        "acceptance_split": acceptance_split,
-        "baseline_accept_score": baseline_accept_score,
-        "candidate_accept_score": candidate_accept_score,
-        "acceptance_score_delta": score_delta,
-        "min_score_improvement": min_score_improvement,
-        "candidate_signature_prompt_chars": len(candidate_signature_prompt),
-        "candidate_effective_prompt_chars": len(candidate_prompt),
-        "fixed_rules_chars": len(_fixed_rules_for_report_type(report_type)),
-        "accuracies": {
-            "baseline": {k: summarize_eval(v) for k, v in baseline_results.items()},
-            "candidate": {k: summarize_eval(v) for k, v in candidate_results.items()},
-            "active_after": {k: summarize_eval(v) for k, v in active_results.items()},
+        "saved_program_existed_before": saved_program_existed,
+        "warm_started": warm_started,
+        "warm_start_status": warm_start_status,
+        "split_sizes": {name: len(values) for name, values in splits.items()},
+        "test_evaluated_this_iteration": evaluate_test,
+        "search_metric_weights": {
+            "exact": cfg.DSPY_SEARCH_EXACT_WEIGHT,
+            "label_f1": cfg.DSPY_SEARCH_F1_WEIGHT,
         },
-        # Backward-compatible summary fields.
-        "baseline_accuracy": baseline_results["test"].accuracy,
-        "candidate_accuracy": candidate_results["test"].accuracy,
-        "optimized_accuracy": active_results["test"].accuracy,
-        "baseline_score": baseline_results["test"].score,
-        "candidate_score": candidate_results["test"].score,
-        "optimized_score": active_results["test"].score,
+        "promotion_metric_weights": {
+            "exact": cfg.DSPY_PROMOTION_EXACT_WEIGHT,
+            "label_f1": cfg.DSPY_PROMOTION_F1_WEIGHT,
+        },
+        "acceptance_split": acceptance_split,
+        "baseline_acceptance_exact": baseline_accept.accuracy,
+        "candidate_acceptance_exact": candidate_accept.accuracy,
+        "baseline_acceptance_promotion": baseline_accept.promotion_score,
+        "candidate_acceptance_promotion": candidate_accept.promotion_score,
+        "promotion_delta": promotion_delta,
+        "candidate_signature_prompt_chars": len(candidate_signature),
+        "candidate_effective_prompt_chars": len(candidate_effective),
+        "fixed_rules_chars": len(_fixed_rules(report_type)),
+        "metrics": {
+            "baseline": {name: summarize_eval(result) for name, result in baseline_results.items()},
+            "candidate": {name: summarize_eval(result) for name, result in candidate_results.items()},
+            "active_after": {name: summarize_eval(result) for name, result in active_results.items()},
+        },
     }
 
-    if layout:
-        summary["folders"] = {"debug": str(layout["debug"]), "prompts": str(layout["prompts"])}
-        summary["prompt_files"] = {
-            "before_prompt": str(layout["prompts"] / "before_prompt.txt"),
-            "after_prompt": str(layout["prompts"] / "after_prompt.txt"),
-            "candidate_prompt": str(layout["prompts"] / "candidate_prompt.txt"),
-            "before_signature_prompt": str(layout["prompts"] / "before_signature_prompt.txt"),
-            "candidate_signature_prompt": str(layout["prompts"] / "candidate_signature_prompt.txt"),
-            "fixed_rules_prompt": str(layout["prompts"] / "fixed_rules_prompt.txt"),
-        }
-        save_predictions_debug(layout["debug"] / "predictions.json", {
-            "baseline": baseline_results,
-            "candidate": candidate_results,
-            "active_after": active_results,
-        })
-        (layout["prompts"] / "before_signature_prompt.txt").write_text(before_signature_prompt, encoding="utf-8")
-        (layout["prompts"] / "candidate_signature_prompt.txt").write_text(candidate_signature_prompt, encoding="utf-8")
-        (layout["prompts"] / "fixed_rules_prompt.txt").write_text(_fixed_rules_for_report_type(report_type), encoding="utf-8")
-        (layout["prompts"] / "candidate_prompt.txt").write_text(candidate_prompt, encoding="utf-8")
-        save_program(optimized_program, layout["prompts"] / "candidate_program.json")
-        (layout["prompts"] / "after_prompt.txt").write_text(candidate_prompt if accepted else before_prompt, encoding="utf-8")
+    if layout is not None:
+        save_predictions(
+            layout["debug"] / "predictions.json",
+            {"baseline": baseline_results, "candidate": candidate_results, "active_after": active_results},
+        )
+        (layout["prompts"] / "candidate_signature_prompt.txt").write_text(candidate_signature, encoding="utf-8")
+        (layout["prompts"] / "candidate_effective_prompt.txt").write_text(candidate_effective, encoding="utf-8")
+        (layout["prompts"] / "fixed_rules.txt").write_text(_fixed_rules(report_type), encoding="utf-8")
+        (layout["prompts"] / "after_signature_prompt.txt").write_text(
+            candidate_signature if accepted else before_signature,
+            encoding="utf-8",
+        )
+        (layout["prompts"] / "after_effective_prompt.txt").write_text(
+            candidate_effective if accepted else before_effective,
+            encoding="utf-8",
+        )
+        save_program(candidate_program, layout["prompts"] / "candidate_program.json")
         save_program(active_program, layout["prompts"] / "after_program.json")
         (layout["root"] / "optimization_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-        save_accuracy_report(layout["root"] / "accuracy_report.txt", summary)
+        save_summary_text(layout["root"] / "accuracy_report.txt", summary)
 
-    print(f"Candidate accepted: {accepted} ({acceptance_reason})")
+    print(f"Candidate accepted: {accepted}. {acceptance_reason}")
     print(saved_program_status)
-    if layout:
-        print(f"Saved this optimization run to {run_dir}")
-        print(f"  Debug files:  {layout['debug']}")
-        print(f"  Prompt files: {layout['prompts']}")
+    if run_dir is not None:
+        print(f"Run artifacts: {run_dir}")
     return summary
 
 
 # =============================================================================
-# CLI
+# Final untouched-test audit
 # =============================================================================
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Optimize DSPy stroke labelers without leaking answer keys into prompts.")
-    parser.add_argument("--reports", "--reports-file", dest="reports_file", default=getattr(cfg, "TRAINING_REPORTS_FILE", cfg.INPUT_REPORT_FILE), help="Path to reports Excel file containing CT/CTA/CTP report text.")
-    parser.add_argument("--ground-truth", default=cfg.GROUND_TRUTH_FILE, help="Path to ground-truth answer key Excel file.")
-    parser.add_argument("--report-type", choices=["CT", "CTA", "CTP"], required=True, help="Which modality to optimize.")
-    parser.add_argument("--max-cases", type=int, default=None, help="Optional number of cases for faster testing.")
-    parser.add_argument("--loop", action="store_true", help="Keep optimizing repeatedly until stopped with Ctrl+C. Each accepted prompt is saved and warm-started by the next iteration.")
-    parser.add_argument("--fresh-start", action="store_true", help="Do not load an existing optimized program before optimizing. Use this only when you want to start over from config.py instructions.")
-    parser.add_argument("--no-run-logs", action="store_true", help="Disable timestamped optimization folders.")
-    parser.add_argument("--history-size", type=int, default=30, help="Number of visible DSPy history items to save per stage.")
-    parser.add_argument("--baseline-only", action="store_true", help="Evaluate the baseline and save debug logs without running MIPRO.")
-    parser.add_argument("--smoke-test", action="store_true", help="Run one test prediction and stop.")
-    parser.add_argument("--allow-demos", action="store_true", help="Allow MIPRO to build demos. Default is OFF to avoid answer leakage.")
-    parser.add_argument("--mipro-valset-source", choices=["train", "dev", "train_dev", "all"], default=getattr(cfg, "DSPY_MIPRO_VALSET_SOURCE", "train"), help="Which split MIPRO uses to evaluate candidate prompts. Default train makes MIPRO score all 28 train cases instead of only 6 dev cases.")
-    parser.add_argument("--accept-equal", action="store_true", help="Accept optimized prompt if the configured acceptance split ties baseline and prompt quality check passes.")
-    parser.add_argument("--save-even-if-worse", action="store_true", help="Deprecated safety valve: candidate_program.json is still logged, but worse candidates will not overwrite the active optimized program.")
+def run_final_test_audit(iteration: int) -> Dict[str, Any]:
+    report_type = str(cfg.TRAIN_REPORT_TYPE).upper().strip()
+    disable_training_caches()
+    configure_dspy()
+    examples = load_examples(
+        cfg.TRAINING_REPORTS_FILE,
+        cfg.GROUND_TRUTH_FILE,
+        report_type,
+        cfg.TRAIN_MAX_CASES,
+    )
+    splits = split_examples(examples, seed=int(cfg.TRAIN_RANDOM_SEED))
+    program, save_name = _program_for_report_type(report_type)
+    save_path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
+    loaded, status = load_program_if_present(program, save_path)
+    print(f"\nFinal untouched-test audit: {status}")
+    result = evaluate_split(program, splits["test"], f"{report_type} final test")
+
+    summary = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "iteration_after": iteration,
+        "report_type": report_type,
+        "program_path": str(save_path),
+        "loaded_saved_program": loaded,
+        "load_status": status,
+        "test": summarize_eval(result),
+    }
+    if cfg.TRAIN_SAVE_RUN_LOGS:
+        run_dir = make_run_dir(report_type, iteration, suffix="_FINAL_AUDIT")
+        layout = make_layout(run_dir)
+        save_split_debug(layout["debug"] / "split_examples.json", splits)
+        save_predictions(layout["debug"] / "predictions.json", {"final_audit": {"test": result}})
+        (layout["root"] / "final_test_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        print(f"Final audit artifacts: {run_dir}")
+    return summary
+
+
+# =============================================================================
+# Entry point: only --loop remains on the command line
+# =============================================================================
+
+
+def _reset_saved_program_if_requested() -> None:
+    if not cfg.TRAIN_RESET_SAVED_PROGRAM_BEFORE_RUN:
+        return
+    report_type = str(cfg.TRAIN_REPORT_TYPE).upper().strip()
+    _, save_name = _program_for_report_type(report_type)
+    path = Path(cfg.DSPY_PROGRAM_DIR) / save_name
+    if path.exists():
+        backup = path.with_suffix(path.suffix + ".bak")
+        if backup.exists():
+            backup.unlink()
+        path.replace(backup)
+        print(f"Moved existing optimized program to {backup}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Optimize the config-selected DSPy stroke labeler.")
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Repeat optimization; each accepted prompt becomes the next iteration's starting program.",
+    )
     args = parser.parse_args()
 
+    validate_training_config()
+    _reset_saved_program_if_requested()
+
     iteration = 1
+    consecutive_rejections = 0
+    interrupted = False
     try:
         while True:
-            train_one(
-                report_type=args.report_type,
-                reports_file=args.reports_file,
-                ground_truth_file=args.ground_truth,
-                max_cases=args.max_cases,
-                iteration=iteration,
-                save_run_logs=not args.no_run_logs,
-                history_size=args.history_size,
-                baseline_only=args.baseline_only,
-                smoke_test=args.smoke_test,
-                allow_demos=args.allow_demos,
-                mipro_valset_source=args.mipro_valset_source,
-                accept_equal=args.accept_equal,
-                save_even_if_worse=args.save_even_if_worse,
-                warm_start=not args.fresh_start,
+            summary = train_one(
+                iteration,
+                evaluate_test=bool(cfg.TRAIN_EVALUATE_TEST_EACH_ITERATION),
             )
-            if not args.loop:
+            accepted = bool(summary.get("candidate_accepted", False))
+            consecutive_rejections = 0 if accepted else consecutive_rejections + 1
+
+            if not args.loop or cfg.TRAIN_BASELINE_ONLY or cfg.TRAIN_SMOKE_TEST:
+                break
+
+            max_iterations = cfg.TRAIN_LOOP_MAX_ITERATIONS
+            if max_iterations is not None and iteration >= int(max_iterations):
+                print(f"Stopping loop at TRAIN_LOOP_MAX_ITERATIONS={max_iterations}.")
+                break
+
+            patience = cfg.TRAIN_LOOP_PATIENCE
+            if patience is not None and consecutive_rejections >= int(patience):
+                print(
+                    f"Stopping loop after {consecutive_rejections} consecutive rejected candidates "
+                    f"(TRAIN_LOOP_PATIENCE={patience})."
+                )
                 break
             iteration += 1
     except KeyboardInterrupt:
+        interrupted = True
         print("\nStopped DSPy optimization loop.")
+
+    if not cfg.TRAIN_BASELINE_ONLY and not cfg.TRAIN_SMOKE_TEST:
+        try:
+            run_final_test_audit(iteration)
+        except Exception as exc:
+            print(f"Final test audit could not run: {type(exc).__name__}: {exc}")
+            if not interrupted:
+                raise
 
 
 if __name__ == "__main__":

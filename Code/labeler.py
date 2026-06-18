@@ -412,7 +412,7 @@ def sanitize_ct_report_sync(case_id: str, ct_report: str) -> Dict[str, Any]:
         schema=CT_SANITIZATION_SCHEMA,
         case_id=case_id,
         tag="CT_Sanitize",
-        temperature=cfg.DSPY_TEMPERATURE,
+        temperature=cfg.DSPY_TASK_TEMPERATURE,
     )
     parsed = _json_from_text(raw)
     if parsed is None:

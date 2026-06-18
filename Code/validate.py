@@ -6,7 +6,6 @@ normalizes both sides, compares them case-by-case, and writes out text and JSON
 reports including accuracy metrics and details for mismatches.
 """
 
-import argparse
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -370,21 +369,11 @@ def build_validation_return(results: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for validation input and output paths."""
-    parser = argparse.ArgumentParser(description="Validate generated answers against ground truth.")
-    parser.add_argument("--generated", required=True, help="JSON file produced by the labeler.")
-    parser.add_argument("--ground-truth", required=True, help="Ground truth Excel file.")
-    parser.add_argument("--report", default="Files/report.txt", help="Path to write the text report.")
-    parser.add_argument("--json-report", default="Files/report.json", help="Path to write the JSON report.")
-    return parser.parse_args()
-
 
 if __name__ == "__main__":
-    args = parse_args()
     check_answers(
-        json_file=args.generated,
-        ground_truth_file=args.ground_truth,
-        report_path=args.report,
-        json_report_path=args.json_report,
+        json_file=cfg.OUTPUT_JSON_FILE,
+        ground_truth_file=cfg.GROUND_TRUTH_FILE,
+        report_path=cfg.TEXT_REPORT_FILE,
+        json_report_path=cfg.JSON_REPORT_FILE,
     )

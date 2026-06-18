@@ -12,6 +12,35 @@ import config as cfg
 from utils import normalize_labels
 
 
+INPUT_DESCRIPTIONS = {
+    "ct_report": "CT brain report text.",
+    "cta_report": "CTA report text.",
+    "ctp_report": "CT perfusion report text.",
+    "mri_report": "MRI report text if available.",
+    "ct_labels": "Already predicted CT labels.",
+    "cta_labels": "Already predicted CTA labels.",
+    "ctp_labels": "Already predicted CTP labels.",
+    "ct_reasoning": "CT reasoning.",
+    "cta_reasoning": "CTA reasoning.",
+    "ctp_reasoning": "CTP reasoning.",
+}
+
+OUTPUT_DESCRIPTIONS = {
+    "labels": "Only comma-separated labels from the allowed list, such as RMCA or NONE.",
+    "reasoning": "Exactly one short sentence; no step-by-step analysis.",
+    "combined_reasoning": "Exactly one short sentence explaining the final combined labels.",
+}
+
+
+def effective_cta_prompt() -> str:
+    """Return the exact CTA instruction/rule combination used at inference."""
+    return (
+        f"{cfg.CTA_SIGNATURE_INSTRUCTIONS.strip()}\n\n"
+        "Fixed CTA output constraints supplied as the `cta_rules` input:\n"
+        f"{cfg.CTA_FIXED_RULES.strip()}"
+    )
+
+
 @dataclass
 class StrokePrediction:
     """Clean output object used by the rest of the pipeline."""
@@ -57,7 +86,7 @@ def configure_dspy() -> None:
 
     lm_kwargs = dict(
         api_base=cfg.DSPY_API_BASE,
-        temperature=cfg.DSPY_TEMPERATURE,
+        temperature=cfg.DSPY_TASK_TEMPERATURE,
         max_tokens=cfg.DSPY_MAX_TOKENS,
         think=False,  # Disable automatic thinking in DSPy/Ollama calls.
     )
@@ -208,7 +237,7 @@ def _direct_ollama_fallback(report_text: str, modality: str) -> StrokePrediction
             # CTA uses a short optimizable signature plus fixed rules supplied
             # through the cta_rules input. The direct fallback has no signature
             # input channel, so include the same effective prompt text here.
-            "CTA": getattr(cfg, "CTA_EFFECTIVE_PROMPT_PREVIEW", cfg.CTA_SIGNATURE_INSTRUCTIONS),
+            "CTA": effective_cta_prompt(),
             "CTP": cfg.CTP_SIGNATURE_INSTRUCTIONS,
         }
 
@@ -235,7 +264,7 @@ Report:
             schema=SINGLE_MODALITY_SCHEMA,
             case_id="fallback",
             tag=f"DSPY_{modality}_FALLBACK",
-            temperature=cfg.DSPY_TEMPERATURE,
+            temperature=cfg.DSPY_TASK_TEMPERATURE,
         )
 
         parsed = _json_from_text(raw)
@@ -340,7 +369,7 @@ CTP: {case.get("CTP_GT_reasoning", "")}
             schema=COMBINED_SCHEMA,
             case_id=str(case.get("case_id", "fallback")),
             tag="DSPY_COMBINED_FALLBACK",
-            temperature=cfg.DSPY_TEMPERATURE,
+            temperature=cfg.DSPY_TASK_TEMPERATURE,
         )
 
         parsed = _json_from_text(raw)
@@ -363,9 +392,9 @@ CTP: {case.get("CTP_GT_reasoning", "")}
 
 
 class CTStrokeSignature(dspy.Signature):
-    report_text: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ct_report"])
-    labels: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["labels"])
-    reasoning: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["reasoning"])
+    report_text: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ct_report"])
+    labels: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["labels"])
+    reasoning: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["reasoning"])
 
 
 class CTAStrokeSignature(dspy.Signature):
@@ -375,30 +404,30 @@ class CTAStrokeSignature(dspy.Signature):
             "These rules are authoritative and must be applied to report_text."
         )
     )
-    report_text: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["cta_report"])
-    labels: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["labels"])
-    reasoning: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["reasoning"])
+    report_text: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["cta_report"])
+    labels: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["labels"])
+    reasoning: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["reasoning"])
 
 
 class CTPStrokeSignature(dspy.Signature):
-    report_text: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ctp_report"])
-    labels: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["labels"])
-    reasoning: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["reasoning"])
+    report_text: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ctp_report"])
+    labels: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["labels"])
+    reasoning: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["reasoning"])
 
 
 class CombinedStrokeSignature(dspy.Signature):
-    ct_report: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ct_report"])
-    cta_report: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["cta_report"])
-    ctp_report: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ctp_report"])
-    mri_report: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["mri_report"])
-    ct_labels: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ct_labels"])
-    cta_labels: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["cta_labels"])
-    ctp_labels: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ctp_labels"])
-    ct_reasoning: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ct_reasoning"])
-    cta_reasoning: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["cta_reasoning"])
-    ctp_reasoning: str = dspy.InputField(desc=cfg.DSPY_INPUT_DESCRIPTIONS["ctp_reasoning"])
-    labels: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["labels"])
-    reasoning: str = dspy.OutputField(desc=cfg.DSPY_OUTPUT_DESCRIPTIONS["combined_reasoning"])
+    ct_report: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ct_report"])
+    cta_report: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["cta_report"])
+    ctp_report: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ctp_report"])
+    mri_report: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["mri_report"])
+    ct_labels: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ct_labels"])
+    cta_labels: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["cta_labels"])
+    ctp_labels: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ctp_labels"])
+    ct_reasoning: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ct_reasoning"])
+    cta_reasoning: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["cta_reasoning"])
+    ctp_reasoning: str = dspy.InputField(desc=INPUT_DESCRIPTIONS["ctp_reasoning"])
+    labels: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["labels"])
+    reasoning: str = dspy.OutputField(desc=OUTPUT_DESCRIPTIONS["combined_reasoning"])
 
 
 # DSPy reads the class docstring as part of the signature instructions.  The
