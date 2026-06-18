@@ -25,7 +25,6 @@ import io
 import json
 import logging
 import math
-import os
 import random
 import re
 from collections import Counter, defaultdict
@@ -580,23 +579,26 @@ def disable_training_caches() -> None:
 
 
 @contextlib.contextmanager
-def capture_optimizer_console(path: Optional[Path]):
-    """Keep optimizer-generated prompt bodies out of the terminal.
+def quiet_optimizer_prompt_logging():
+    """Hide optimizer prompt bodies while preserving progress bars.
 
-    MIPROv2 and GEPA may print complete proposed instructions while compiling.
-    Redirect stdout and stderr to a run log instead. If run logging is disabled,
-    discard the optimizer's internal console output.
+    MIPROv2 emits proposed instructions through INFO-level logging and can
+    print complete candidate programs when its verbose flag is enabled.  The
+    optimizer is configured with verbose=False below, and this context manager
+    temporarily suppresses DEBUG/INFO log records during compilation.  It does
+    not redirect stdout or stderr, so DSPy/tqdm progress bars remain visible.
+    Warnings, errors, and tracebacks are still shown.
     """
-    if path is None:
-        with open(os.devnull, "w", encoding="utf-8") as sink:
-            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                yield
+    if bool(getattr(cfg, "TRAIN_SHOW_OPTIMIZER_PROMPTS", False)):
+        yield
         return
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", buffering=1) as sink:
-        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-            yield
+    previous_disable_level = logging.root.manager.disable
+    logging.disable(logging.INFO)
+    try:
+        yield
+    finally:
+        logging.disable(previous_disable_level)
 
 
 def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> Any:
@@ -604,7 +606,7 @@ def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> 
         "api_base": api_base,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "enable_thinking": False,
+        "think": False,
     }
     if cfg.DSPY_DISABLE_CACHE:
         kwargs["cache"] = False
@@ -615,7 +617,7 @@ def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> 
         try:
             return dspy.LM(model, **kwargs)
         except TypeError:
-            kwargs.pop("enable_thinking", None)
+            kwargs.pop("think", None)
             return dspy.LM(model, **kwargs)
 
 
@@ -677,7 +679,9 @@ def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
             "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
             "seed": int(cfg.DSPY_MIPRO_SEED),
             "init_temperature": float(cfg.DSPY_MIPRO_INIT_TEMPERATURE),
-            "verbose": bool(cfg.DSPY_MIPRO_VERBOSE),
+            # False by default: save prompt bodies to artifacts without
+            # printing them. Progress bars are independent of this flag.
+            "verbose": bool(cfg.TRAIN_SHOW_OPTIMIZER_PROMPTS),
             "track_stats": True,
             "metric_threshold": float(cfg.DSPY_MIPRO_METRIC_THRESHOLD),
         }
@@ -1205,22 +1209,12 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         return summary
 
     optimizer_name, optimizer = build_optimizer(run_dir)
-    optimizer_console_path = (
-        layout["debug"] / "optimizer_console.log"
-        if layout is not None
-        else None
-    )
     print(
         f"{optimizer_name.upper()} will train on {len(splits['train'])} examples and "
         f"search on {len(splits['optimizer_val'])} optimizer-validation examples."
     )
-    if optimizer_console_path is not None:
-        print(f"Optimizer console output saved to: {optimizer_console_path}")
-    else:
-        print("Optimizer console output is hidden because TRAIN_SAVE_RUN_LOGS is disabled.")
-
     try:
-        with capture_optimizer_console(optimizer_console_path):
+        with quiet_optimizer_prompt_logging():
             candidate_program = compile_program(
                 optimizer_name,
                 optimizer,
@@ -1233,14 +1227,8 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
             append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile error", int(cfg.TRAIN_HISTORY_SIZE))
             (layout["debug"] / "compile_error.txt").write_text(f"{type(exc).__name__}: {exc}", encoding="utf-8")
             save_predictions(layout["debug"] / "predictions.json", {"baseline": baseline_results})
-        log_hint = (
-            f" Also inspect {optimizer_console_path}."
-            if optimizer_console_path is not None
-            else ""
-        )
         raise RuntimeError(
-            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt "
-            f"and DSPy history.{log_hint}"
+            f"{optimizer_name.upper()} compile failed. Inspect the run folder's compile_error.txt and DSPy history."
         ) from exc
 
     if layout is not None:

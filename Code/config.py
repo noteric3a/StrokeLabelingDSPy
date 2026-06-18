@@ -135,7 +135,9 @@ DSPY_ACCEPTANCE_SPLIT = "dev"
 DSPY_MIPRO_AUTO = "medium"  # light, medium, or heavy
 DSPY_MIPRO_SEED = 9
 DSPY_MIPRO_INIT_TEMPERATURE = 0.9
-DSPY_MIPRO_VERBOSE = True
+# False keeps optimizer-generated prompt bodies out of the terminal while
+# preserving DSPy/tqdm progress bars. Prompts are still saved in run artifacts.
+TRAIN_SHOW_OPTIMIZER_PROMPTS = False
 DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS = 3
 DSPY_MIPRO_MAX_LABELED_DEMOS = 0
 DSPY_MIPRO_METRIC_THRESHOLD = 1.0  # Keep only exact bootstrapped demonstrations.
@@ -147,7 +149,7 @@ DSPY_MIPRO_VIEW_DATA_BATCH_SIZE = 20
 DSPY_MIPRO_MINIBATCH_SIZE = 8
 DSPY_MIPRO_MINIBATCH_FULL_EVAL_STEPS = 3
 
-# GEPA settings.
+# Optional GEPA settings.
 DSPY_GEPA_AUTO = "medium"
 DSPY_GEPA_SEED = 9
 DSPY_GEPA_REFLECTION_MINIBATCH_SIZE = 3
@@ -158,7 +160,7 @@ DSPY_GEPA_USE_MERGE = True
 # Candidate-signature guard.  This validates the instruction DSPy generated,
 # not the fixed rules concatenated into a debug preview.
 DSPY_PROMPT_MIN_CHARS = 250
-DSPY_PROMPT_MAX_CHARS = 20000
+DSPY_PROMPT_MAX_CHARS = 6000
 DSPY_PROMPT_FORBIDDEN_TERMS = (
     "step-by-step",
     "chain of thought",
@@ -347,41 +349,58 @@ Rules:
 - Return only allowed comma-separated labels and exactly one short reasoning sentence.
 """.strip()
 
-# Only schema/output invariants are fixed.  The substantive CTA decision policy
-# remains in CTA_SIGNATURE_INSTRUCTIONS so DSPy can improve it.
-CTA_FIXED_RULES = f"""
-Use only these labels: {_ALLOWED_LABELS_TEXT}.
-Return at least one label.  NONE is exclusive and may not appear with a positive label.
-Do not invent labels, emit every label, request JSON, or provide step-by-step analysis.
-Return exactly one short reasoning sentence in the reasoning field.
-""".strip()
-
-CTA_SIGNATURE_INSTRUCTIONS = f"""
+CTA_BASE_PROMPT = f"""
 Your goal is to label acute stroke-related vascular territory from CTA report text.
 
 Allowed labels: {_ALLOWED_LABELS_TEXT}.
 
 CTA-specific rules:
-- Target only acute or newly/worsening large-vessel occlusion, named branch occlusion, or severe flow-limiting stenosis.
+- Target only acute or newly/worsening large-vessel occlusion, named branch
+  occlusion, or severe flow-limiting stenosis.
 - Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
-- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute territory is clearly stated.
-- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute territory is clearly stated.
-- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA maps to LACA.
-- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA maps to LPCA.
-- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA, supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
-- Use RCA/LCA only for common carotid or cervical carotid involvement. Do not use RCA/LCA for carotid terminus.
-- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
-- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
-- Do not include NONE with any positive label. If the answer is NONE, output only NONE.
-- Never output every allowed label. Output only labels directly supported by the report.
-- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, stable findings, congenital variants, or hypoplastic vessels.
+- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute
+  territory is clearly stated.
+- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute
+  territory is clearly stated.
+- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA
+  maps to LACA.
+- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA
+  maps to LPCA.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA,
+  supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement.
+  Do not use RCA/LCA for carotid terminus.
+- Prefer specific downstream territory labels when MCA/ACA/PCA involvement
+  is clearly identified.
+- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion
+  is present.
+- Do not include NONE with any positive label. If the answer is NONE,
+  output only NONE.
+- Never output every allowed label. Output only labels directly supported
+  by the report.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion,
+  stable findings, congenital variants, or hypoplastic vessels.
 
 Output rules:
 - Do not explain step by step.
 - Do not write hidden analysis.
-- Labels must be only comma-separated allowed labels.
+- Labels must contain only comma-separated allowed labels.
 - Reasoning must be exactly one short sentence summarizing the key report finding.
-- End immediately after the labels.
+- Return no additional fields or commentary.
+""".strip()
+
+# Keep the base prompt in the fixed CTA input.
+CTA_FIXED_RULES = CTA_BASE_PROMPT
+
+CTA_SIGNATURE_INSTRUCTIONS = """
+Apply the authoritative `cta_rules` to the CTA `report_text`.
+
+Use this supplemental instruction to improve recognition of radiology wording,
+named vessel segments, laterality, acuity, uncertainty, negation, and
+parent-versus-downstream territory selection.
+
+Do not summarize, replace, weaken, or contradict `cta_rules`.
+Return only the required labels and one short reasoning sentence.
 """.strip()
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""
