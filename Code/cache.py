@@ -3,12 +3,13 @@
 import json
 from pathlib import Path
 from typing import Set
+import config as cfg
 
 
 class ProcessingCache:
     """Manages a cache of processed case IDs to skip already-completed work."""
     
-    def __init__(self, cache_file: str | Path = "Files/.processing_cache.json"):
+    def __init__(self, cache_file: str | Path = cfg.CACHE_FILE):
         """Initialize the cache.
         
         Args:

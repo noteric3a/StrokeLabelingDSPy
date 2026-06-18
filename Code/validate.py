@@ -7,17 +7,16 @@ reports including accuracy metrics and details for mismatches.
 """
 
 import json
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
 
-import config as cfg
 from utils import normalize_labels
 from convert import convert
 from lazy_excel import LazyExcelReader
+import config as cfg
 
 def normalize_gt(label_str: Any) -> set:
     """Normalize a ground truth label string into a set of uppercase labels."""
@@ -81,8 +80,8 @@ def _process_case_comparison(gen_case: Dict[str, Any], gt_case: Dict[str, Any] |
 def check_answers(
     json_file: str,
     ground_truth_file: str,
-    report_path: str = "Files/report.txt",
-    json_report_path: str = "Files/report.json",
+    report_path: str = cfg.TEXT_REPORT_FILE,
+    json_report_path: str = cfg.JSON_REPORT_FILE,
 ) -> Dict[str, Any]:
     """Load generated data and ground truth, compare them case-by-case, and generate reports."""
 
@@ -138,7 +137,7 @@ def check_answers(
 
     # Read the ground truth spreadsheet lazily to minimize memory usage.
     try:
-        reader = LazyExcelReader(ground_truth_file, chunk_size=50)
+        reader = LazyExcelReader(ground_truth_file, chunk_size=cfg.LAZY_EXCEL_CHUNK_SIZE)
         print(f"Reading ground truth file in chunks ({reader.get_stats()})")
     except Exception as e:
         print(f"⚠️ Failed to initialize lazy reader: {e}, falling back to standard read")
@@ -371,58 +370,10 @@ def build_validation_return(results: Dict[str, Any]) -> Dict[str, Any]:
 
 
 
-def run_from_config() -> Dict[str, Any]:
-    """Validate the generated JSON and ground truth selected in config.py."""
-
-    generated = getattr(
-        cfg,
-        "VALIDATION_GENERATED_JSON_FILE",
-        getattr(cfg, "OUTPUT_JSON_FILE", ""),
-    )
-    ground_truth = getattr(
-        cfg,
-        "VALIDATION_GROUND_TRUTH_FILE",
-        getattr(cfg, "GROUND_TRUTH_FILE", ""),
-    )
-    report_path = getattr(
-        cfg,
-        "VALIDATION_TEXT_REPORT_FILE",
-        cfg.FILES_DIR / "report.txt",
-    )
-    json_report_path = getattr(
-        cfg,
-        "VALIDATION_JSON_REPORT_FILE",
-        cfg.FILES_DIR / "report.json",
-    )
-
-    if not str(generated).strip():
-        raise ValueError("config.VALIDATION_GENERATED_JSON_FILE cannot be blank.")
-    return check_answers(
-        json_file=str(generated),
-        ground_truth_file=str(ground_truth),
-        report_path=str(report_path),
-        json_report_path=str(json_report_path),
-    )
-
-
-def reject_command_line_arguments(arguments: list[str] | None = None) -> None:
-    """Keep config.py as the only standalone validation control surface."""
-
-    supplied = list(sys.argv[1:] if arguments is None else arguments)
-    if supplied:
-        raise SystemExit(
-            "Command-line arguments are disabled. Edit the validation settings "
-            f"in config.py instead. Unexpected arguments: {supplied}"
-        )
-
-
-def main() -> None:
-    reject_command_line_arguments()
-    try:
-        run_from_config()
-    except (ValueError, FileNotFoundError) as exc:
-        raise SystemExit(f"Validation configuration error: {exc}") from exc
-
-
 if __name__ == "__main__":
-    main()
+    check_answers(
+        json_file=cfg.OUTPUT_JSON_FILE,
+        ground_truth_file=cfg.GROUND_TRUTH_FILE,
+        report_path=cfg.TEXT_REPORT_FILE,
+        json_report_path=cfg.JSON_REPORT_FILE,
+    )
