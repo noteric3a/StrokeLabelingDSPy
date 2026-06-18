@@ -124,7 +124,6 @@ class OptimizerSettings:
     num_ctx: int
     timeout: int
     num_retries: int
-    no_cache: bool
     validation_fraction: float
     test_fraction: float
     seed: int
@@ -173,7 +172,6 @@ def optimizer_settings_from_config() -> OptimizerSettings:
         num_ctx=int(getattr(cfg, "DSPY_OPTIMIZER_NUM_CTX", getattr(cfg, "DSPY_NUM_CTX", cfg.NUM_CTX))),
         timeout=int(getattr(cfg, "DSPY_OPTIMIZER_TIMEOUT_SECONDS", cfg.REQUEST_TIMEOUT_SECONDS)),
         num_retries=int(getattr(cfg, "DSPY_OPTIMIZER_NUM_RETRIES", 2)),
-        no_cache=not bool(getattr(cfg, "DSPY_OPTIMIZER_CACHE", True)),
         validation_fraction=float(getattr(cfg, "DSPY_VALIDATION_FRACTION", 0.20)),
         test_fraction=float(getattr(cfg, "DSPY_TEST_FRACTION", 0.10)),
         seed=int(getattr(cfg, "DSPY_RANDOM_SEED", 42)),
@@ -1458,6 +1456,9 @@ def run_optimizer(args: OptimizerSettings) -> int:
     }
 
     api_base = args.api_base or getattr(cfg, "DSPY_OLLAMA_API_BASE", "") or ollama_api_base(cfg.OLLAMA_URL)
+    # The optimizer intentionally disables DSPy/LiteLLM response caching. Each
+    # training, validation, candidate, and reflection call should hit the local
+    # model so prompt changes and repeated evaluations are measured directly.
     task_lm = create_lm(
         model=args.task_model,
         api_base=api_base,
@@ -1465,7 +1466,7 @@ def run_optimizer(args: OptimizerSettings) -> int:
         max_tokens=args.max_tokens,
         num_ctx=args.num_ctx,
         timeout_seconds=args.timeout,
-        cache=not args.no_cache,
+        cache=False,
         num_retries=args.num_retries,
     )
     reflection_lm = create_lm(
@@ -1475,7 +1476,7 @@ def run_optimizer(args: OptimizerSettings) -> int:
         max_tokens=args.reflection_max_tokens,
         num_ctx=args.num_ctx,
         timeout_seconds=args.timeout,
-        cache=not args.no_cache,
+        cache=False,
         num_retries=args.num_retries,
     )
     adapter = create_adapter(args.adapter)

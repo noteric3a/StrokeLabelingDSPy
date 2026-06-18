@@ -95,7 +95,7 @@ LABELING_BACKEND = "ollama"
 # DSPy runtime settings used when LABELING_BACKEND = "dspy".
 DSPY_OLLAMA_API_BASE = ""  # Blank derives the server root from OLLAMA_URL.
 DSPY_ADAPTER = "json"  # "json" or "chat"
-DSPY_LM_CACHE = True
+DSPY_LM_CACHE = True  # Runtime labeling cache only. The optimizer always disables LM caching.
 DSPY_REQUIRE_OPTIMIZED_PROGRAMS = False
 # False keeps the established manual Combined prompt. True also loads
 # combined_program.json from DSPY_PROGRAM_DIR.
@@ -174,7 +174,7 @@ DSPY_REFLECTION_MAX_TOKENS = max(4000, DSPY_MAX_TOKENS)
 DSPY_OPTIMIZER_NUM_CTX = DSPY_NUM_CTX
 DSPY_OPTIMIZER_TIMEOUT_SECONDS = REQUEST_TIMEOUT_SECONDS
 DSPY_OPTIMIZER_NUM_RETRIES = 2
-DSPY_OPTIMIZER_CACHE = DSPY_LM_CACHE
+# Optimizer LM response caching is always disabled in code.
 
 # Fixed case-level split. Set both fractions to 0 only for a deliberate
 # fit-the-entire-sheet experiment; that does not measure generalization.
