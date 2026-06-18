@@ -6,8 +6,8 @@ from config.py so repeated experiments are reproducible and easy to compare.
 Accuracy-oriented design:
 - supervised training examples expose reference labels as DSPy output fields,
   never as task-model inputs;
-- a stratified four-way split separates prompt training, optimizer validation,
-  promotion, and final testing;
+- a fixed untouched test set plus phenotype-aware stratification separates
+  prompt training, optimizer validation, promotion, and final testing;
 - for CTA, the manual base prompt is immutable and DSPy optimizes only one
   supplemental instruction; accepted supplements replace rather than concatenate;
 - DSPy receives a dense exact/F1 search reward;
@@ -61,6 +61,7 @@ _GOLD_BY_REPORT_KEY: Dict[str, str] = {}
 _RAW_GOLD_BY_REPORT_KEY: Dict[str, Any] = {}
 _CASE_ID_BY_REPORT_KEY: Dict[str, str] = {}
 _REPORT_INTEGRITY_BY_EXACT_TEXT: Dict[str, Tuple[int, str]] = {}
+_POLICY_CONFLICTS_EXCLUDED: List[Dict[str, Any]] = []
 
 
 def _report_key(report_text: Any) -> str:
@@ -297,10 +298,22 @@ def gepa_feedback_metric(
     else:
         missing = sorted(expected - predicted)
         extra = sorted(predicted - expected)
+        report = _report_text_for_example(gold).lower()
+        categories: List[str] = []
+        if extra and ("stenos" in report or "narrow" in report):
+            categories.append("possible false-positive from stenosis/narrowing wording")
+        if extra and ({"RICA", "LICA"} & set(extra)) and ({"RMCA", "LMCA", "RACA", "LACA"} & expected):
+            categories.append("possible parent-ICA versus downstream-territory error")
+        if missing and ("occlu" in report or "throm" in report or "nonopac" in report):
+            categories.append("possible missed occlusion/thrombus terminology")
+        if "chronic" in report or "stable" in report or "unchanged" in report:
+            categories.append("acuity/chronicity distinction is relevant")
+        category_text = "; ".join(categories) if categories else "general vessel/laterality/negation error"
         feedback = (
             f"Expected {sorted(expected)} but predicted {sorted(predicted)}. "
             f"Missing labels: {missing or 'none'}. Extra labels: {extra or 'none'}. "
-            "Revise only the supplemental instruction. Add a generalizable distinction for "
+            f"Likely error category: {category_text}. "
+            "Revise only the supplemental instruction with a generalizable distinction for "
             "radiology wording, vessel segment, laterality, acuity, uncertainty, negation, or "
             "parent-versus-downstream selection. Do not restate, weaken, or contradict the "
             "immutable CTA base prompt, and do not break cases that already match."
@@ -371,13 +384,49 @@ def validate_training_config() -> None:
         validate_cta_base_plus_supplement_config()
 
     ratios = dict(cfg.TRAIN_SPLIT_RATIOS)
-    required = {"train", "optimizer_val", "dev", "test"}
+    fixed_test_ids = tuple(str(value).strip() for value in getattr(cfg, "TRAIN_FIXED_TEST_CASE_IDS", ()) if str(value).strip())
+    required = {"train", "optimizer_val", "dev"} if fixed_test_ids else {"train", "optimizer_val", "dev", "test"}
     if set(ratios) != required:
-        raise ValueError(f"TRAIN_SPLIT_RATIOS must contain exactly {sorted(required)}.")
+        raise ValueError(
+            f"TRAIN_SPLIT_RATIOS must contain exactly {sorted(required)} when "
+            f"TRAIN_FIXED_TEST_CASE_IDS is {'set' if fixed_test_ids else 'empty'}."
+        )
     if any(float(value) <= 0 for value in ratios.values()):
         raise ValueError("Every TRAIN_SPLIT_RATIOS value must be positive.")
     if not math.isclose(sum(float(value) for value in ratios.values()), 1.0, abs_tol=1e-9):
         raise ValueError("TRAIN_SPLIT_RATIOS values must sum to 1.0.")
+    if len(fixed_test_ids) != len(set(fixed_test_ids)):
+        raise ValueError("TRAIN_FIXED_TEST_CASE_IDS contains duplicate case IDs.")
+    conflict_ids = {
+        str(value).strip() for value in getattr(cfg, "CTA_POLICY_CONFLICT_CASE_IDS", ())
+        if str(value).strip()
+    }
+    overlap = set(fixed_test_ids) & conflict_ids
+    if overlap:
+        raise ValueError(
+            "CTA policy-conflict cases cannot also be fixed test cases: " + ", ".join(sorted(overlap))
+        )
+
+    fixed_non_test = getattr(cfg, "TRAIN_FIXED_NON_TEST_SPLIT_CASE_IDS", {}) or {}
+    if not isinstance(fixed_non_test, Mapping):
+        raise ValueError("TRAIN_FIXED_NON_TEST_SPLIT_CASE_IDS must be a mapping of split names to case IDs.")
+    seen_fixed_non_test: Set[str] = set()
+    for split_name, case_ids in fixed_non_test.items():
+        if split_name not in {"train", "optimizer_val", "dev"}:
+            raise ValueError(
+                "TRAIN_FIXED_NON_TEST_SPLIT_CASE_IDS keys must be train, optimizer_val, or dev."
+            )
+        for value in case_ids:
+            case_id = str(value).strip()
+            if not case_id:
+                continue
+            if case_id in seen_fixed_non_test:
+                raise ValueError(f"Case {case_id} is fixed to more than one non-test split.")
+            seen_fixed_non_test.add(case_id)
+    if seen_fixed_non_test & set(fixed_test_ids):
+        raise ValueError("A case cannot be fixed to both the test set and a non-test split.")
+    if seen_fixed_non_test & conflict_ids:
+        raise ValueError("A configured policy-conflict case cannot also be fixed to a training split.")
 
     for pair in (
         (cfg.DSPY_SEARCH_EXACT_WEIGHT, cfg.DSPY_SEARCH_F1_WEIGHT),
@@ -390,10 +439,10 @@ def validate_training_config() -> None:
     if optimizer_name not in {"mipro", "miprov2", "gepa"}:
         raise ValueError("DSPY_OPTIMIZER must be 'mipro' or 'gepa'.")
 
+    if str(cfg.DSPY_ACCEPTANCE_SPLIT) not in {"train", "optimizer_val", "dev"}:
+        raise ValueError("DSPY_ACCEPTANCE_SPLIT must be train, optimizer_val, or dev.")
     if str(cfg.DSPY_ACCEPTANCE_SPLIT) not in ratios:
-        raise ValueError("DSPY_ACCEPTANCE_SPLIT must name one of the configured splits.")
-    if str(cfg.DSPY_ACCEPTANCE_SPLIT) == "test":
-        raise ValueError("The final test split cannot be used as the promotion split.")
+        raise ValueError("DSPY_ACCEPTANCE_SPLIT must name one of TRAIN_SPLIT_RATIOS.")
 
     context_window = int(cfg.DSPY_CONTEXT_WINDOW)
     task_output = int(cfg.DSPY_MAX_TOKENS)
@@ -522,6 +571,7 @@ def load_examples(
     _RAW_GOLD_BY_REPORT_KEY.clear()
     _CASE_ID_BY_REPORT_KEY.clear()
     _REPORT_INTEGRITY_BY_EXACT_TEXT.clear()
+    _POLICY_CONFLICTS_EXCLUDED.clear()
 
     examples: List[Any] = []
     missing_gt = 0
@@ -542,6 +592,22 @@ def load_examples(
             continue
 
         raw_gold = gt_by_case[case_id]
+        conflict_ids = {
+            str(value).strip() for value in getattr(cfg, "CTA_POLICY_CONFLICT_CASE_IDS", ())
+            if str(value).strip()
+        }
+        if (
+            report_type == "CTA"
+            and bool(getattr(cfg, "TRAIN_EXCLUDE_CTA_POLICY_CONFLICTS", False))
+            and case_id in conflict_ids
+        ):
+            _POLICY_CONFLICTS_EXCLUDED.append({
+                "case_id": case_id,
+                "ground_truth": str(raw_gold),
+                "reason": "configured CTA answer-key conflict with immutable acute-only policy",
+            })
+            continue
+
         labels = sorted(normalize_gt(raw_gold), key=lambda label: cfg.LABEL_ORDER.index(label))
         normalized_gold = ", ".join(labels)
         key = _report_key(report_text)
@@ -583,6 +649,11 @@ def load_examples(
     print(f"Skipped rows missing ground truth: {missing_gt}")
     if duplicate_conflicts:
         print(f"Skipped duplicate report texts with conflicting labels: {len(duplicate_conflicts)}")
+    if _POLICY_CONFLICTS_EXCLUDED:
+        print(
+            "Excluded configured CTA policy-conflict cases: "
+            + ", ".join(item["case_id"] for item in _POLICY_CONFLICTS_EXCLUDED)
+        )
     if not examples:
         raise ValueError("No training examples were loaded. Check paths, case IDs, and column names.")
     return examples
@@ -626,21 +697,37 @@ def _target_split_sizes(total: int, ratios: Mapping[str, float]) -> Dict[str, in
 
 
 def _stratification_features(example: Any) -> Set[str]:
+    """Balance labels, label sets, and common CTA difficulty phenotypes."""
     labels = _gold_labels_for_example(example)
     set_token = "SET=" + "+".join(sorted(labels))
-    return set(labels) | {set_token}
+    features = set(labels) | {set_token}
+    report = _report_text_for_example(example).lower()
+
+    if "occlu" in report or "nonopac" in report or "cutoff" in report:
+        features.add("FINDING=OCCLUSION")
+    if "throm" in report or "filling defect" in report:
+        features.add("FINDING=THROMBUS")
+    if "stenos" in report or "narrow" in report:
+        features.add("FINDING=STENOSIS")
+    if "chronic" in report or "stable" in report or "unchanged" in report:
+        features.add("STATUS=CHRONIC_STABLE")
+    if any(term in report for term in ("possible", "suspected", "may be", "cannot exclude", "limited evaluation")):
+        features.add("STATUS=UNCERTAIN")
+    if any(term in report for term in ("carotid terminus", "intracranial ica", "supraclinoid", "paraclinoid", "petrous")):
+        features.add("ANATOMY=INTRACRANIAL_ICA")
+    if labels == {"NONE"}:
+        features.add("OUTCOME=NONE")
+    if len(labels - {"NONE"}) > 1:
+        features.add("OUTCOME=MULTILABEL")
+    return features
 
 
-def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
-    """Greedily preserve labels and multilabel combinations across four splits."""
-    examples = list(examples)
-    ratios = {name: float(value) for name, value in cfg.TRAIN_SPLIT_RATIOS.items()}
-    if len(examples) < len(ratios):
-        raise ValueError(
-            f"Only {len(examples)} examples were loaded; at least {len(ratios)} are needed "
-            "for train/optimizer_val/dev/test."
-        )
-
+def _greedy_stratified_assignment(
+    examples: List[Any],
+    ratios: Mapping[str, float],
+    seed: int,
+) -> Dict[str, List[Any]]:
+    """Greedily preserve labels, label sets, and difficulty phenotypes."""
     targets = _target_split_sizes(len(examples), ratios)
     feature_counts: Counter[str] = Counter()
     records: List[Tuple[Any, Set[str], float]] = []
@@ -650,7 +737,6 @@ def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
         feature_counts.update(features)
         records.append((example, features, rng.random()))
 
-    # Rare labels and rare exact label sets are placed first.
     records.sort(
         key=lambda item: (
             min(feature_counts[feature] for feature in item[1]),
@@ -660,7 +746,7 @@ def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
     )
 
     desired_feature_counts: Dict[str, Dict[str, float]] = {
-        split: {feature: feature_counts[feature] * ratios[split] for feature in feature_counts}
+        split: {feature: feature_counts[feature] * float(ratios[split]) for feature in feature_counts}
         for split in ratios
     }
     current_feature_counts: Dict[str, Counter[str]] = {split: Counter() for split in ratios}
@@ -685,11 +771,104 @@ def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
         result[chosen].append(example)
         current_feature_counts[chosen].update(features)
 
-    for split, items in result.items():
-        random.Random(seed + list(ratios).index(split) + 1).shuffle(items)
+    for index, (split, items) in enumerate(result.items()):
+        random.Random(seed + index + 1).shuffle(items)
         if not items:
             raise ValueError(f"Stratification produced an empty {split} split.")
     return result
+
+
+def split_examples(examples: List[Any], seed: int) -> Dict[str, List[Any]]:
+    """Create a fixed untouched test set and stratify the remaining examples."""
+    examples = list(examples)
+    ratios = {name: float(value) for name, value in cfg.TRAIN_SPLIT_RATIOS.items()}
+    fixed_test_ids = {
+        str(value).strip() for value in getattr(cfg, "TRAIN_FIXED_TEST_CASE_IDS", ())
+        if str(value).strip()
+    }
+
+    if fixed_test_ids:
+        by_case_id = {_case_id_for_example(example): example for example in examples}
+        missing_test = fixed_test_ids - set(by_case_id)
+        if missing_test:
+            raise ValueError(
+                "TRAIN_FIXED_TEST_CASE_IDS were not loaded: " + ", ".join(sorted(missing_test))
+                + ". Do not use TRAIN_MAX_CASES with a fixed test set unless every fixed test case is retained."
+            )
+
+        fixed_non_test_config = getattr(cfg, "TRAIN_FIXED_NON_TEST_SPLIT_CASE_IDS", {}) or {}
+        fixed_non_test: Dict[str, List[Any]] = {split: [] for split in ratios}
+        fixed_non_test_ids: Set[str] = set()
+        for split_name, case_ids in fixed_non_test_config.items():
+            if split_name not in fixed_non_test:
+                continue
+            for raw_case_id in case_ids:
+                case_id = str(raw_case_id).strip()
+                if not case_id:
+                    continue
+                example = by_case_id.get(case_id)
+                if example is None:
+                    raise ValueError(
+                        f"TRAIN_FIXED_NON_TEST_SPLIT_CASE_IDS references an unloaded case: {case_id}"
+                    )
+                fixed_non_test[split_name].append(example)
+                fixed_non_test_ids.add(case_id)
+
+        non_test = [
+            example for example in examples
+            if _case_id_for_example(example) not in fixed_test_ids
+        ]
+        targets = _target_split_sizes(len(non_test), ratios)
+        for split_name, fixed_items in fixed_non_test.items():
+            if len(fixed_items) > targets[split_name]:
+                raise ValueError(
+                    f"Too many cases are fixed to {split_name}: {len(fixed_items)} > target {targets[split_name]}."
+                )
+
+        pool = [
+            example for example in non_test
+            if _case_id_for_example(example) not in fixed_non_test_ids
+        ]
+        capacities = {
+            split_name: targets[split_name] - len(fixed_non_test[split_name])
+            for split_name in ratios
+        }
+        if any(value <= 0 for value in capacities.values()):
+            raise ValueError(
+                "Every non-test split must retain at least one stratified slot after fixed challenge cases."
+            )
+        capacity_total = sum(capacities.values())
+        remaining_ratios = {
+            split_name: capacities[split_name] / capacity_total
+            for split_name in ratios
+        }
+        assigned = _greedy_stratified_assignment(pool, remaining_ratios, seed)
+        result: Dict[str, List[Any]] = {}
+        for index, split_name in enumerate(ratios):
+            combined = list(fixed_non_test[split_name]) + list(assigned[split_name])
+            random.Random(seed + 100 + index).shuffle(combined)
+            result[split_name] = combined
+            if len(combined) != targets[split_name]:
+                raise RuntimeError(
+                    f"Split sizing error for {split_name}: {len(combined)} != target {targets[split_name]}."
+                )
+        result["test"] = sorted(
+            (by_case_id[case_id] for case_id in fixed_test_ids),
+            key=lambda item: _case_id_for_example(item),
+        )
+        return result
+
+    required = {"train", "optimizer_val", "dev", "test"}
+    if set(ratios) != required:
+        raise ValueError(
+            "Without TRAIN_FIXED_TEST_CASE_IDS, TRAIN_SPLIT_RATIOS must contain "
+            "train, optimizer_val, dev, and test."
+        )
+    if len(examples) < len(ratios):
+        raise ValueError(
+            f"Only {len(examples)} examples were loaded; at least {len(ratios)} are needed."
+        )
+    return _greedy_stratified_assignment(examples, ratios, seed)
 
 
 # =============================================================================
@@ -788,9 +967,17 @@ def _gepa_class() -> Any:
         raise ImportError("GEPA is unavailable. Upgrade DSPy and install the GEPA dependency, or set DSPY_OPTIMIZER='mipro'.") from exc
 
 
-def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
+def _optimizer_seed(optimizer_name: str, iteration: int) -> int:
+    base = int(cfg.DSPY_MIPRO_SEED if optimizer_name in {"mipro", "miprov2"} else cfg.DSPY_GEPA_SEED)
+    if bool(getattr(cfg, "TRAIN_ADVANCE_OPTIMIZER_SEED_PER_ITERATION", False)):
+        return base + max(0, int(iteration) - 1)
+    return base
+
+
+def build_optimizer(run_dir: Optional[Path], iteration: int) -> Tuple[str, Any, int]:
     optimizer_name = str(cfg.DSPY_OPTIMIZER).lower().strip()
     prompt_model = prompt_or_reflection_model()
+    optimizer_seed = _optimizer_seed(optimizer_name, iteration)
 
     if optimizer_name in {"mipro", "miprov2"}:
         optimizer_class = _mipro_class()
@@ -800,7 +987,7 @@ def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
             "auto": cfg.DSPY_MIPRO_AUTO,
             "max_bootstrapped_demos": int(cfg.DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS),
             "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
-            "seed": int(cfg.DSPY_MIPRO_SEED),
+            "seed": optimizer_seed,
             "init_temperature": float(cfg.DSPY_MIPRO_INIT_TEMPERATURE),
             "verbose": bool(cfg.DSPY_MIPRO_VERBOSE),
             "track_stats": True,
@@ -809,7 +996,7 @@ def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
         if run_dir is not None:
             kwargs["log_dir"] = str(run_dir / "optimizer_logs")
         kwargs = _filter_supported_kwargs(optimizer_class, kwargs)
-        return "mipro", optimizer_class(**kwargs)
+        return "mipro", optimizer_class(**kwargs), optimizer_seed
 
     optimizer_class = _gepa_class()
     kwargs = {
@@ -821,12 +1008,12 @@ def build_optimizer(run_dir: Optional[Path]) -> Tuple[str, Any]:
         "add_format_failure_as_feedback": bool(cfg.DSPY_GEPA_ADD_FORMAT_FAILURE_AS_FEEDBACK),
         "use_merge": bool(cfg.DSPY_GEPA_USE_MERGE),
         "track_stats": True,
-        "seed": int(cfg.DSPY_GEPA_SEED),
+        "seed": optimizer_seed,
     }
     if run_dir is not None:
         kwargs["log_dir"] = str(run_dir / "optimizer_logs")
     kwargs = _filter_supported_kwargs(optimizer_class, kwargs)
-    return "gepa", optimizer_class(**kwargs)
+    return "gepa", optimizer_class(**kwargs), optimizer_seed
 
 
 def compile_program(
@@ -835,6 +1022,7 @@ def compile_program(
     program: Any,
     trainset: List[Any],
     optimizer_valset: List[Any],
+    optimizer_seed: int,
 ) -> Any:
     compile_kwargs: Dict[str, Any] = {
         "trainset": trainset,
@@ -844,7 +1032,7 @@ def compile_program(
         compile_kwargs.update({
             "max_bootstrapped_demos": int(cfg.DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS),
             "max_labeled_demos": int(cfg.DSPY_MIPRO_MAX_LABELED_DEMOS),
-            "seed": int(cfg.DSPY_MIPRO_SEED),
+            "seed": int(optimizer_seed),
             "minibatch_size": min(int(cfg.DSPY_MIPRO_MINIBATCH_SIZE), len(optimizer_valset)),
             "minibatch_full_eval_steps": int(cfg.DSPY_MIPRO_MINIBATCH_FULL_EVAL_STEPS),
             "program_aware_proposer": bool(cfg.DSPY_MIPRO_PROGRAM_AWARE_PROPOSER),
@@ -1170,21 +1358,28 @@ def _candidate_terms_absent_from_base(supplement: str, base_prompt: str) -> List
 
 
 def _forbidden_phrase_is_active(normalized_prompt: str, forbidden: str) -> bool:
-    """Ignore a forbidden phrase when it is explicitly negated (e.g. do not override)."""
+    """Return True only for an active unsafe directive, not a negated prohibition.
+
+    This accepts lists such as "Do not summarize, replace, or contradict the base
+    prompt" while still rejecting "Replace the base prompt".
+    """
     phrase = _normalized_prompt(forbidden)
     start = 0
+    negators = ("do not", "don't", "never", "must not", "should not", "may not", "cannot")
     while True:
         index = normalized_prompt.find(phrase, start)
         if index < 0:
             return False
-        prefix = normalized_prompt[max(0, index - 24):index].strip()
-        if not (
-            prefix.endswith("do not")
-            or prefix.endswith("don't")
-            or prefix.endswith("never")
-            or prefix.endswith("must not")
-            or prefix.endswith("should not")
-        ):
+        clause_start = max(
+            normalized_prompt.rfind(".", 0, index),
+            normalized_prompt.rfind(";", 0, index),
+            normalized_prompt.rfind(":", 0, index),
+            normalized_prompt.rfind("!", 0, index),
+            normalized_prompt.rfind("?", 0, index),
+        ) + 1
+        clause_prefix = normalized_prompt[clause_start:index].strip()
+        negated = any(re.search(rf"\b{re.escape(negator)}\b", clause_prefix) for negator in negators)
+        if not negated:
             return True
         start = index + len(phrase)
 
@@ -1256,6 +1451,7 @@ def save_split_debug(
         },
         "sizes": {},
         "label_counts": {},
+        "excluded_policy_conflicts": list(_POLICY_CONFLICTS_EXCLUDED),
         "examples": [],
     }
     for split, examples in splits.items():
@@ -1413,14 +1609,14 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
             save_summary_text(layout["root"] / "accuracy_report.txt", summary)
         return summary
 
-    optimizer_name, optimizer = build_optimizer(run_dir)
+    optimizer_name, optimizer, optimizer_seed = build_optimizer(run_dir, iteration)
     optimizer_console_path = (
         layout["debug"] / "optimizer_console.log"
         if layout is not None
         else None
     )
     print(
-        f"{optimizer_name.upper()} will train on {len(splits['train'])} examples and "
+        f"{optimizer_name.upper()} seed {optimizer_seed} will train on {len(splits['train'])} examples and "
         f"search on {len(splits['optimizer_val'])} optimizer-validation examples."
     )
     if optimizer_console_path is not None:
@@ -1436,6 +1632,7 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
                 program,
                 splits["train"],
                 splits["optimizer_val"],
+                optimizer_seed,
             )
     except Exception as exc:
         if layout is not None:
@@ -1460,25 +1657,44 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
     if layout is not None:
         append_history(layout["debug"] / "dspy_history.txt", "after optimizer compile", int(cfg.TRAIN_HISTORY_SIZE))
 
-    candidate_results = evaluate_splits(candidate_program, eval_splits, f"{report_type} candidate", error_history)
-    if layout is not None:
-        append_history(layout["debug"] / "dspy_history.txt", "after candidate evaluation", int(cfg.TRAIN_HISTORY_SIZE))
-
     candidate_signature = extract_program_instructions(candidate_program)
     candidate_effective = effective_prompt_text(report_type, candidate_signature)
     candidate_new_terms = _candidate_terms_absent_from_base(candidate_signature, base_prompt) if base_prompt else []
     quality_ok, quality_reason = prompt_quality_ok(candidate_signature, report_type)
+    instruction_only = (
+        int(getattr(cfg, "DSPY_MIPRO_MAX_BOOTSTRAPPED_DEMOS", 0)) == 0
+        and int(getattr(cfg, "DSPY_MIPRO_MAX_LABELED_DEMOS", 0)) == 0
+    )
+    candidate_unchanged = instruction_only and candidate_signature.strip() == before_signature.strip()
+    candidate_evaluation_skipped = bool(
+        candidate_unchanged
+        and getattr(cfg, "TRAIN_SKIP_UNCHANGED_CANDIDATE_EVALUATION", False)
+    )
+
+    if candidate_evaluation_skipped:
+        candidate_results = baseline_results
+        print("Optimizer returned the unchanged instruction; deterministic candidate re-evaluation was skipped.")
+    else:
+        candidate_results = evaluate_splits(candidate_program, eval_splits, f"{report_type} candidate", error_history)
+        if layout is not None:
+            append_history(layout["debug"] / "dspy_history.txt", "after candidate evaluation", int(cfg.TRAIN_HISTORY_SIZE))
 
     acceptance_split = str(cfg.DSPY_ACCEPTANCE_SPLIT)
     baseline_accept = baseline_results[acceptance_split]
     candidate_accept = candidate_results[acceptance_split]
-    accepted, acceptance_reason, promotion_delta, exact_non_regression = decide_promotion(
-        baseline_accept,
-        candidate_accept,
-        split_name=acceptance_split,
-        quality_ok=quality_ok,
-        quality_reason=quality_reason,
-    )
+    if candidate_evaluation_skipped:
+        accepted = False
+        acceptance_reason = "optimizer returned an unchanged instruction-only candidate"
+        promotion_delta = 0.0
+        exact_non_regression = True
+    else:
+        accepted, acceptance_reason, promotion_delta, exact_non_regression = decide_promotion(
+            baseline_accept,
+            candidate_accept,
+            split_name=acceptance_split,
+            quality_ok=quality_ok,
+            quality_reason=quality_reason,
+        )
 
     active_program = candidate_program if accepted else program
     active_results = candidate_results if accepted else baseline_results
@@ -1497,7 +1713,10 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         "iteration": iteration,
         "report_type": report_type,
         "optimizer": optimizer_name,
+        "optimizer_seed": optimizer_seed,
         "candidate_accepted": accepted,
+        "candidate_unchanged": candidate_unchanged,
+        "candidate_evaluation_skipped": candidate_evaluation_skipped,
         "acceptance_reason": acceptance_reason,
         "prompt_quality_reason": quality_reason,
         "saved_program_status": saved_program_status,
@@ -1506,6 +1725,8 @@ def train_one(iteration: int, *, evaluate_test: bool = False) -> Dict[str, Any]:
         "warm_started": warm_started,
         "warm_start_status": warm_start_status,
         "split_sizes": {name: len(values) for name, values in splits.items()},
+        "fixed_test_case_ids": list(getattr(cfg, "TRAIN_FIXED_TEST_CASE_IDS", ())),
+        "excluded_policy_conflicts": list(_POLICY_CONFLICTS_EXCLUDED),
         "report_integrity": {
             "full_report_text_logged": True,
             "exact_report_guard_enabled": True,
@@ -1644,7 +1865,11 @@ def run_final_test_audit(iteration: int) -> Dict[str, Any]:
                 effective_prompt_text(report_type, active_supplement), encoding="utf-8"
             )
         (layout["root"] / "final_test_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        latest_path = Path(cfg.TRAIN_RUNS_ROOT) / report_type / "latest_final_test_summary.json"
+        latest_path.parent.mkdir(parents=True, exist_ok=True)
+        latest_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"Final audit artifacts: {run_dir}")
+        print(f"Latest final-test summary: {latest_path}")
     return summary
 
 
@@ -1679,6 +1904,10 @@ def main() -> None:
     validate_training_config()
     _reset_saved_program_if_requested()
 
+    if bool(getattr(cfg, "TRAIN_FINAL_AUDIT_ONLY", False)):
+        run_final_test_audit(0)
+        return
+
     iteration = 1
     consecutive_rejections = 0
     interrupted = False
@@ -1711,7 +1940,12 @@ def main() -> None:
         interrupted = True
         print("\nStopped DSPy optimization loop.")
 
-    if not cfg.TRAIN_BASELINE_ONLY and not cfg.TRAIN_SMOKE_TEST:
+    if (
+        bool(getattr(cfg, "TRAIN_RUN_FINAL_TEST_AFTER_OPTIMIZATION", False))
+        and not interrupted
+        and not cfg.TRAIN_BASELINE_ONLY
+        and not cfg.TRAIN_SMOKE_TEST
+    ):
         try:
             run_final_test_audit(iteration)
         except Exception as exc:
