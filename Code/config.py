@@ -356,7 +356,33 @@ Do not invent labels, emit every label, request JSON, or provide step-by-step an
 Return exactly one short reasoning sentence in the reasoning field.
 """.strip()
 
-CTA_SIGNATURE_INSTRUCTIONS = _build_cta_signature()
+CTA_SIGNATURE_INSTRUCTIONS = f"""
+Your goal is to label acute stroke-related vascular territory from CTA report text.
+
+Allowed labels: {_ALLOWED_LABELS_TEXT}.
+
+CTA-specific rules:
+- Target only acute or newly/worsening large-vessel occlusion, named branch occlusion, or severe flow-limiting stenosis.
+- Use MCA/ACA/PCA labels for named branch occlusion or severe flow-limiting stenosis.
+- Right M1/M2/MCA occlusion or thrombus maps to RMCA only unless another acute territory is clearly stated.
+- Left M1/M2/MCA occlusion or thrombus maps to LMCA only unless another acute territory is clearly stated.
+- Right A1/A2/ACA occlusion or severe stenosis maps to RACA; left A1/A2/ACA maps to LACA.
+- Right P1/P2/PCA severe stenosis or occlusion maps to RPCA; left P1/P2/PCA maps to LPCA.
+- Use RICA/LICA for acute intracranial ICA, carotid terminus, terminal ICA, supraclinoid ICA, paraclinoid ICA, or intracranial carotid involvement.
+- Use RCA/LCA only for common carotid or cervical carotid involvement. Do not use RCA/LCA for carotid terminus.
+- Prefer specific downstream territory labels when MCA/ACA/PCA involvement is clearly identified.
+- Use NONE when no qualifying acute occlusion or severe flow-limiting lesion is present.
+- Do not include NONE with any positive label. If the answer is NONE, output only NONE.
+- Never output every allowed label. Output only labels directly supported by the report.
+- Do not label mild stenosis, incidental atherosclerosis, chronic occlusion, stable findings, congenital variants, or hypoplastic vessels.
+
+Output rules:
+- Do not explain step by step.
+- Do not write hidden analysis.
+- Labels must be only comma-separated allowed labels.
+- Reasoning must be exactly one short sentence summarizing the key report finding.
+- End immediately after the labels.
+""".strip()
 
 CTP_SIGNATURE_INSTRUCTIONS = f"""
 Label acute perfusion territory from CT perfusion report text.
