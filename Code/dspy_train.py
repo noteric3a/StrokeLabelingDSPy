@@ -604,7 +604,7 @@ def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> 
         "api_base": api_base,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "think": False,
+        "enable_thinking": False,
     }
     if cfg.DSPY_DISABLE_CACHE:
         kwargs["cache"] = False
@@ -615,7 +615,7 @@ def _make_lm(model: str, api_base: str, temperature: float, max_tokens: int) -> 
         try:
             return dspy.LM(model, **kwargs)
         except TypeError:
-            kwargs.pop("think", None)
+            kwargs.pop("enable_thinking", None)
             return dspy.LM(model, **kwargs)
 
 
